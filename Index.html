@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cell Registry — SW5e</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;--surface:#0f1014;--surface2:#15161b;--surface3:#1c1d24;
+  --amber:#d4873a;--amber-dim:#7a4a1a;--amber-glow:rgba(212,135,58,0.10);
+  --amber-border:rgba(212,135,58,0.22);--amber-border-bright:rgba(212,135,58,0.5);
+  --green:#3dba7e;--green-dim:rgba(61,186,126,0.15);
+  --blue:#5b9bd5;--blue-dim:rgba(91,155,213,0.15);
+  --red:#d45b5b;--red-dim:rgba(212,91,91,0.15);
+  --purple:#9b7fe8;--purple-dim:rgba(155,127,232,0.15);
+  --text:#c8b898;--text-muted:#5a5040;--text-bright:#f0e4cc;--text-dim:#7a6a50;
+  --border:rgba(212,135,58,0.13);--border-mid:rgba(212,135,58,0.26);
+  --font-d:'Barlow Condensed',sans-serif;--font-b:'Barlow',sans-serif;--font-m:'Share Tech Mono',monospace;
+  --r:3px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);pointer-events:none;z-index:9999}
+
+/* HEADER */
+.site-header{border-bottom:1px solid var(--border-mid);padding:1.25rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg);z-index:100;gap:1rem}
+.brand-eyebrow{font-family:var(--font-m);font-size:9px;letter-spacing:.2em;color:var(--amber-dim);text-transform:uppercase;margin-bottom:3px}
+.brand-name{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.header-right{display:flex;align-items:center;gap:1rem}
+.sync-status{font-family:var(--font-m);font-size:10px;color:var(--text-muted);letter-spacing:.08em;display:flex;align-items:center;gap:6px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;transition:background .3s}
+.sync-dot.synced{background:var(--green);animation:pulse 2s infinite}
+.sync-dot.saving{background:var(--amber);animation:pulse .6s infinite}
+.sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.config-btn{font-family:var(--font-m);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:var(--r);padding:5px 10px;cursor:pointer;transition:color .15s,border-color .15s}
+.config-btn:hover{color:var(--amber);border-color:var(--amber-border-bright)}
+
+/* NAV */
+.main-nav{display:flex;gap:2px;padding:0 2rem;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+.nav-btn{font-family:var(--font-m);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.active{color:var(--amber);border-bottom-color:var(--amber)}
+.nav-divider{width:1px;background:var(--border);margin:6px 4px;flex-shrink:0}
+
+/* PAGES */
+.page{display:none;animation:fadein .2s ease}
+.page.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* SETUP MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r);padding:2rem;max-width:520px;width:100%;position:relative}
+.modal h2{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--text-bright);letter-spacing:.04em;margin-bottom:4px}
+.modal-sub{font-family:var(--font-m);font-size:10px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.5rem}
+.modal-field{margin-bottom:1rem}
+.modal-label{font-family:var(--font-m);font-size:10px;color:var(--amber-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;display:block}
+.modal-input{width:100%;background:var(--surface2);border:1px solid var(--border-mid);border-radius:var(--r);padding:8px 12px;font-family:var(--font-m);font-size:12px;color:var(--text-bright);outline:none;transition:border-color .15s}
+.modal-input:focus{border-color:var(--amber-border-bright)}
+.modal-input::placeholder{color:var(--text-muted)}
+.modal-hint{font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5}
+.modal-hint a{color:var(--amber);text-decoration:none}
+.modal-actions{display:flex;gap:.75rem;margin-top:1.5rem}
+.btn-primary{font-family:var(--font-m);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:var(--amber);color:var(--bg);border:none;border-radius:var(--r);padding:8px 18px;cursor:pointer;transition:opacity .15s;font-weight:700}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{font-family:var(--font-m);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:none;color:var(--text-muted);border:1px solid var(--border);border-radius:var(--r);padding:8px 18px;cursor:pointer;transition:color .15s}
+.btn-secondary:hover{color:var(--text)}
+.modal-error{background:var(--red-dim);border:1px solid rgba(212,91,91,.3);border-radius:var(--r);padding:8px 12px;font-size:12px;color:var(--red);margin-top:1rem;display:none}
+.modal-error.visible{display:block}
+
+/* LOADING */
+.loading-screen{position:fixed;inset:0;background:var(--bg);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem}
+.loading-screen.hidden{display:none}
+.loading-title{font-family:var(--font-d);font-size:28px;font-weight:700;color:var(--amber);letter-spacing:.08em;text-transform:uppercase}
+.loading-sub{font-family:var(--font-m);font-size:11px;color:var(--text-muted);letter-spacing:.12em}
+.loading-bar{width:200px;height:2px;background:var(--surface2);border-radius:1px;overflow:hidden;margin-top:.5rem}
+.loading-fill{height:100%;background:var(--amber);border-radius:1px;animation:loadbar 1.5s ease infinite}
+@keyframes loadbar{0%{width:0;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0;margin-left:100%}}
+
+/* CHAR LAYOUT */
+.char-layout{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 116px)}
+.char-sidebar{background:var(--surface);border-right:1px solid var(--border);padding:1.25rem;display:flex;flex-direction:column;gap:1.1rem}
+.char-portrait{width:100%;aspect-ratio:3/4;background:var(--surface2);border:1px solid var(--border-mid);border-radius:var(--r);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;font-size:48px}
+.portrait-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.75);padding:5px 8px;font-family:var(--font-m);font-size:9px;color:var(--amber);letter-spacing:.1em;text-transform:uppercase;text-align:center}
+.char-name{font-family:var(--font-d);font-size:24px;font-weight:700;color:var(--text-bright);letter-spacing:.03em;line-height:1.1}
+.char-species{font-family:var(--font-m);font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-top:2px}
+.char-class-line{font-size:13px;color:var(--amber);margin-top:5px;font-weight:500}
+.sidebar-block{border-top:1px solid var(--border);padding-top:.9rem}
+.block-label{font-family:var(--font-m);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--amber-dim);margin-bottom:7px}
+
+/* Editable HP */
+.hp-editor{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.hp-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border-mid);background:var(--surface2);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;line-height:1;font-family:var(--font-d)}
+.hp-btn:hover{border-color:var(--amber-border-bright);color:var(--amber)}
+.hp-display{display:flex;align-items:baseline;gap:4px;flex:1;justify-content:center}
+.hp-current{font-family:var(--font-d);font-size:32px;font-weight:700;color:var(--green);line-height:1;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.hp-current:hover{border-color:var(--green)}
+.hp-sep{font-size:16px;color:var(--text-muted)}
+.hp-max{font-family:var(--font-d);font-size:18px;color:var(--text-dim);line-height:1}
+.temp-hp{font-family:var(--font-m);font-size:10px;color:var(--blue);margin-top:2px;cursor:pointer}
+.temp-hp:hover{color:var(--text-bright)}
+
+/* FP pips */
+.fp-display{font-family:var(--font-d);font-size:20px;font-weight:700;color:var(--purple);line-height:1;margin-bottom:5px}
+.fp-pips{display:flex;gap:4px;flex-wrap:wrap}
+.fp-pip{width:14px;height:14px;border-radius:50%;border:1px solid var(--purple);background:transparent;cursor:pointer;transition:background .15s}
+.fp-pip.filled{background:var(--purple)}
+
+/* Mini stats */
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mini-stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:6px 4px;text-align:center}
+.mini-val{font-family:var(--font-d);font-size:17px;font-weight:600;color:var(--text-bright);line-height:1}
+.mini-lbl{font-family:var(--font-m);font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+
+/* Char main */
+.char-main{padding:1.25rem 1.75rem;display:flex;flex-direction:column;gap:1.25rem}
+.sheet-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.sheet-section-header{padding:.55rem 1rem;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sheet-section-title{font-family:var(--font-m);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.section-add-btn{font-family:var(--font-m);font-size:9px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:var(--r);padding:2px 9px;cursor:pointer;letter-spacing:.08em;transition:color .15s,border-color .15s}
+.section-add-btn:hover{color:var(--amber);border-color:var(--amber-border)}
+.sheet-section-body{padding:.9rem 1rem}
+
+/* Abilities */
+.ability-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.ability-box{background:var(--surface2);border:1px solid var(--border-mid);border-radius:var(--r);padding:7px 3px;text-align:center}
+.ability-name{font-family:var(--font-m);font-size:8px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase}
+.ability-score{font-family:var(--font-d);font-size:20px;font-weight:700;color:var(--text-bright);line-height:1.1}
+.ability-mod{font-family:var(--font-m);font-size:11px;color:var(--amber)}
+
+/* Saves/skills */
+.saves-skills-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.skill-list{display:flex;flex-direction:column;gap:2px}
+.skill-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text)}
+.skill-pip{width:7px;height:7px;border-radius:50%;border:1px solid var(--border-mid);flex-shrink:0}
+.skill-pip.prof{background:var(--amber);border-color:var(--amber)}
+.skill-pip.exp{background:var(--green);border-color:var(--green)}
+.skill-val{font-family:var(--font-m);font-size:11px;color:var(--amber);margin-left:auto;min-width:22px;text-align:right}
+
+/* Force powers */
+.power-row{display:grid;grid-template-columns:1fr auto auto;gap:.75rem;align-items:start;padding:6px 0;border-bottom:1px solid var(--border)}
+.power-row:last-child{border-bottom:none}
+.power-name{font-size:13px;font-weight:500;color:var(--text-bright)}
+.power-desc{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.4}
+.power-cost{font-family:var(--font-m);font-size:10px;color:var(--purple);white-space:nowrap}
+.power-type{font-family:var(--font-m);font-size:9px;padding:2px 6px;border-radius:2px;border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
+
+/* Inventory */
+.inv-table{width:100%;border-collapse:collapse}
+.inv-table th{font-family:var(--font-m);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);text-align:left;padding:3px 7px;border-bottom:1px solid var(--border)}
+.inv-table td{font-size:12px;color:var(--text);padding:5px 7px;border-bottom:1px solid var(--border);vertical-align:middle}
+.inv-table tr:last-child td{border-bottom:none}
+.inv-table tr:hover td{background:var(--amber-glow)}
+.rarity{font-family:var(--font-m);font-size:9px;padding:1px 5px;border-radius:2px}
+.r-standard{color:var(--text-muted);border:1px solid var(--border)}
+.r-uncommon{color:var(--blue);border:1px solid rgba(91,155,213,.3);background:var(--blue-dim)}
+.r-rare{color:var(--purple);border:1px solid rgba(155,127,232,.3);background:var(--purple-dim)}
+.r-legendary{color:var(--amber);border:1px solid var(--amber-border);background:var(--amber-glow)}
+.credits-row{display:flex;align-items:baseline;gap:6px;margin-top:.6rem}
+.credits-val{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--amber);line-height:1;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.credits-val:hover{border-color:var(--amber)}
+.credits-lbl{font-family:var(--font-m);font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
+.del-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px;transition:color .15s;line-height:1}
+.del-btn:hover{color:var(--red)}
+
+/* Downtime */
+.dt-list{display:flex;flex-direction:column;gap:6px}
+.dt-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:9px 11px;display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:start}
+.dt-activity{font-size:13px;font-weight:500;color:var(--text-bright);cursor:pointer}
+.dt-result{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.4;cursor:pointer}
+.dt-status-btn{font-family:var(--font-m);font-size:9px;padding:2px 7px;border-radius:2px;cursor:pointer;border:none;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.s-success{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,186,126,.3) !important}
+.s-pending{background:var(--amber-glow);color:var(--amber);border:1px solid var(--amber-border) !important}
+.s-fail{background:var(--red-dim);color:var(--red);border:1px solid rgba(212,91,91,.3) !important}
+
+/* Relationships */
+.rel-list{display:flex;flex-direction:column;gap:0}
+.rel-row{display:grid;grid-template-columns:32px 1fr auto;gap:.7rem;align-items:start;padding:8px 0;border-bottom:1px solid var(--border)}
+.rel-row:last-child{border-bottom:none}
+.rel-icon{width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border-mid);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.rel-name{font-size:13px;font-weight:500;color:var(--text-bright)}
+.rel-role{font-size:11px;color:var(--text-muted)}
+.rel-note{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.4;font-style:italic;cursor:pointer}
+.bond-meter{display:flex;gap:3px;margin-top:4px}
+.bond-pip{width:12px;height:5px;border-radius:1px;background:var(--surface3);border:1px solid var(--border);cursor:pointer;transition:background .15s}
+.bond-pip.filled{background:var(--amber);border-color:var(--amber)}
+
+/* Notes */
+.notes-area{width:100%;background:var(--surface2);border:1px solid var(--border-mid);border-radius:var(--r);padding:10px;font-family:var(--font-b);font-size:13px;color:var(--text);line-height:1.6;resize:vertical;min-height:100px;outline:none;transition:border-color .15s}
+.notes-area:focus{border-color:var(--amber-border-bright)}
+.notes-area::placeholder{color:var(--text-muted)}
+.save-note{font-family:var(--font-m);font-size:9px;color:var(--text-muted);margin-top:4px;letter-spacing:.08em}
+
+/* OPERATIONS PAGE */
+.ops-page{padding:1.25rem 1.75rem;max-width:1300px;margin:0 auto;display:flex;flex-direction:column;gap:1.25rem}
+.page-title{font-family:var(--font-d);font-size:28px;font-weight:700;color:var(--text-bright);letter-spacing:.04em}
+.page-sub{font-family:var(--font-m);font-size:10px;color:var(--text-muted);letter-spacing:.1em;margin-top:3px}
+.ops-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
+.ops-stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:12px 13px}
+.ops-stat-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.ops-stat-name{font-family:var(--font-m);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+.ops-stat-val{font-family:var(--font-d);font-size:28px;font-weight:700;line-height:1}
+.ops-bar{height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:6px}
+.ops-bar-fill{height:100%;border-radius:2px}
+.ops-stat-sub{font-size:11px;color:var(--text-dim);line-height:1.4}
+.ops-char-block{margin-bottom:1rem}
+.ops-char-label{font-family:var(--font-d);font-size:15px;font-weight:600;letter-spacing:.03em;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.downtime-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:7px}
+.event-list{display:flex;flex-direction:column}
+.event-row{display:grid;grid-template-columns:64px 1fr auto;gap:1rem;align-items:start;padding:9px 0;border-bottom:1px solid var(--border)}
+.event-row:last-child{border-bottom:none}
+.event-session{font-family:var(--font-m);font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;padding-top:2px}
+.event-title{font-size:13px;font-weight:500;color:var(--text-bright);margin-bottom:2px}
+.event-desc{font-size:12px;color:var(--text-dim);line-height:1.5}
+.event-effect{font-family:var(--font-m);font-size:10px;white-space:nowrap;padding:2px 8px;border-radius:2px}
+.effect-pos{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,186,126,.3)}
+.effect-neg{background:var(--red-dim);color:var(--red);border:1px solid rgba(212,91,91,.3)}
+
+/* SHIPS PAGE */
+.ships-page{padding:1.25rem 1.75rem;max-width:1400px;margin:0 auto}
+.ships-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.1rem;margin-top:1.1rem}
+.ship-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;position:relative}
+.ship-card::before,.ship-card::after{content:'';position:absolute;width:10px;height:10px;pointer-events:none;z-index:2}
+.ship-card::before{top:-1px;left:-1px;border-top:1px solid var(--amber);border-left:1px solid var(--amber)}
+.ship-card::after{bottom:-1px;right:-1px;border-bottom:1px solid var(--amber);border-right:1px solid var(--amber)}
+.ship-card-header{padding:.9rem 1.1rem .7rem;border-bottom:1px solid var(--border)}
+.ship-faction-badge{font-family:var(--font-m);font-size:9px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;margin-bottom:7px;display:inline-block}
+.sfb-rebel{background:rgba(212,91,91,.1);color:var(--red);border:1px solid rgba(212,91,91,.25)}
+.sfb-vossar{background:rgba(155,127,232,.1);color:var(--purple);border:1px solid rgba(155,127,232,.25)}
+.sfb-virellian{background:rgba(61,186,126,.1);color:var(--green);border:1px solid rgba(61,186,126,.25)}
+.ship-name{font-family:var(--font-d);font-size:19px;font-weight:700;color:var(--text-bright);letter-spacing:.02em;line-height:1.15}
+.ship-class{font-family:var(--font-m);font-size:9px;color:var(--text-muted);letter-spacing:.07em;margin-top:2px}
+.ship-tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--border)}
+.ship-tab{flex:1;padding:7px 4px;font-family:var(--font-m);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .15s,border-color .15s}
+.ship-tab:hover{color:var(--text)}
+.ship-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.ship-pane{display:none;padding:.9rem 1.1rem}
+.ship-pane.active{display:block}
+.ship-stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:.65rem}
+.ship-stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:6px 3px;text-align:center}
+.sstat-val{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--amber);line-height:1}
+.sstat-lbl{font-family:var(--font-m);font-size:7px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.ship-bar-labels{display:flex;justify-content:space-between;font-family:var(--font-m);font-size:9px;color:var(--text-muted);margin-bottom:2px}
+.ship-bar{height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:7px}
+.ship-bar-fill{height:100%;border-radius:2px}
+.bar-hp-fill{background:var(--green)}
+.bar-sp-fill{background:var(--blue)}
+.ship-abilities{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:.65rem}
+.sab{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:5px 2px;text-align:center}
+.sab-name{font-family:var(--font-m);font-size:7px;color:var(--text-muted)}
+.sab-score{font-family:var(--font-d);font-size:13px;font-weight:600;color:var(--text-bright);line-height:1.2}
+.sab-mod{font-family:var(--font-m);font-size:9px;color:var(--amber)}
+.ship-sec-label{font-family:var(--font-m);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--amber-dim);border-bottom:1px solid var(--amber-dim);padding-bottom:3px;margin-bottom:7px}
+.ship-trait{font-size:12px;color:var(--text);margin-bottom:6px;line-height:1.5}
+.ship-trait strong{color:var(--text-bright);font-weight:500}
+.ship-action{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.ship-action:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.ship-action-header{display:flex;align-items:baseline;gap:5px;margin-bottom:2px;flex-wrap:wrap}
+.ship-action-name{font-family:var(--font-d);font-size:13px;font-weight:600;color:var(--text-bright)}
+.ship-action-uses{font-family:var(--font-m);font-size:9px;color:var(--amber)}
+.ship-action-type{font-family:var(--font-m);font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid var(--border);color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-left:auto}
+.ship-action-desc{font-size:11.5px;color:var(--text);line-height:1.5}
+.ship-pilot-note{background:var(--surface2);border-left:2px solid var(--purple);padding:9px 11px;border-radius:0 var(--r) var(--r) 0;font-size:12px;line-height:1.6;color:var(--text)}
+.ship-pilot-note strong{font-family:var(--font-m);font-size:8px;color:var(--purple);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:5px}
+
+/* Inline edit */
+.editable{cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.editable:hover{border-color:currentColor}
+.inline-input{background:var(--surface2);border:1px solid var(--amber-border-bright);border-radius:var(--r);padding:2px 6px;font-size:inherit;font-family:inherit;color:var(--text-bright);outline:none;width:auto}
+
+@media(max-width:768px){
+  .char-layout{grid-template-columns:1fr}
+  .char-sidebar{border-right:none;border-bottom:1px solid var(--border)}
+  .ability-grid{grid-template-columns:repeat(3,1fr)}
+  .saves-skills-grid{grid-template-columns:1fr}
+  .site-header,.char-main,.ops-page,.ships-page{padding:1rem}
+  .main-nav{padding:0 .5rem}
+  .event-row{grid-template-columns:1fr;gap:.25rem}
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP MODAL -->
+<div class="modal-overlay" id="setupModal">
+  <div class="modal">
+    <h2>Connect Your Sheet</h2>
+    <div class="modal-sub">One-time setup — takes about 2 minutes</div>
+    <div class="modal-field">
+      <label class="modal-label">Google Sheets ID</label>
+      <input class="modal-input" id="sheetId" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+      <div class="modal-hint">From your Sheet URL: docs.google.com/spreadsheets/d/<strong style="color:var(--amber)">THIS PART</strong>/edit</div>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Google API Key</label>
+      <input class="modal-input" id="apiKey" placeholder="AIzaSy..." type="password" />
+      <div class="modal-hint">
+        Get a free key at <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → APIs &amp; Services → Credentials → Create API Key. Enable the <strong style="color:var(--amber)">Google Sheets API</strong>. Restrict the key to your hosting domain for security.
+      </div>
+    </div>
+    <div class="modal-error" id="setupError"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveConfig()">Connect</button>
+      <button class="btn-secondary" onclick="loadDemo()">Demo mode (no Sheet)</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-title">Cell Registry</div>
+  <div class="loading-sub">Decrypting secure channel...</div>
+  <div class="loading-bar"><div class="loading-fill"></div></div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+  <header class="site-header">
+    <div>
+      <div class="brand-eyebrow">SW5e — OT Era Campaign</div>
+      <div class="brand-name">Cell Registry</div>
+    </div>
+    <div class="header-right">
+      <div class="sync-status">
+        <div class="sync-dot" id="syncDot"></div>
+        <span id="syncLabel">NOT CONNECTED</span>
+      </div>
+      <button class="config-btn" onclick="openConfig()">⚙ Config</button>
+    </div>
+  </header>
+  <nav class="main-nav" id="mainNav"></nav>
+  <main id="pageContainer"></main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════
+let SHEET_ID = '';
+let API_KEY  = '';
+let DEMO_MODE = false;
+let SAVE_TIMER = null;
+
+// ═══════════════════════════════════════════════════════
+//  STATIC DATA (read-only, set by DM in the Sheet)
+// ═══════════════════════════════════════════════════════
+// Sheet tab names expected:
+//   "Config"      — A1: sheet version
+//   "Characters"  — one row per character, columns defined below
+//   "Inventory_X" — one tab per character name (e.g. Inventory_Kael)
+//   "Downtime_X"  — one tab per character name
+//   "Relations_X" — one tab per character name
+//   "Faction"     — faction stats + event log
+//   "Ships"       — ship data (read-only)
+
+// ═══════════════════════════════════════════════════════
+//  DEMO DATA (used when no Sheet is connected)
+// ═══════════════════════════════════════════════════════
+const DEMO = {
+  characters: [
+    {
+      id:'pc1', name:'Character One', species:'Human', classLine:'Guardian 5 / Scout 2',
+      portrait:'⚔️', portraitLabel:'Guardian', color:'var(--amber)',
+      hp:52, hpMax:52, hpTemp:0,
+      ac:16, initiative:'+3', speed:'30 ft.',
+      fp:6, fpMax:8,
+      str:[16,3],dex:[14,2],con:[14,2],int:[10,0],wis:[12,1],cha:[10,0],
+      saves:[{n:'Strength',m:'+5',p:true},{n:'Dexterity',m:'+2',p:false},{n:'Constitution',m:'+4',p:true},{n:'Intelligence',m:'+0',p:false},{n:'Wisdom',m:'+1',p:false},{n:'Charisma',m:'+0',p:false}],
+      skills:[{n:'Athletics',m:'+5',p:true},{n:'Acrobatics',m:'+2',p:false},{n:'Stealth',m:'+2',p:false},{n:'Perception',m:'+3',p:true},{n:'Insight',m:'+1',p:false},{n:'Persuasion',m:'+0',p:false},{n:'Piloting',m:'+4',p:true},{n:'Lore',m:'+0',p:false}],
+      forcePowers:[{name:'Force Push / Pull',cost:'1 FP',type:'Universal',desc:'Move a creature or object up to 30 ft.'},{name:'Saber Ward',cost:'1 FP',type:'Light',desc:'+2 to AC until end of your next turn.'},{name:'Battle Meditation',cost:'2 FP',type:'Light',desc:'Allies within 30 ft. gain advantage on one attack roll.'}],
+      inventory:[{name:'Lightsaber (Blue)',qty:1,wt:'1 kg',rarity:'rare',notes:'Kyber crystal from Weik'},{name:'Heavy Blaster Pistol',qty:1,wt:'1 kg',rarity:'standard',notes:''},{name:'Medpac',qty:3,wt:'.5 kg',rarity:'standard',notes:'Restore 2d4+2 HP'}],
+      credits:850,
+      downtime:[{activity:'Force Meditation',result:'Regained 1 FP. Glimpsed a figure in white.',status:'success'},{activity:'Form Practice',result:'Focusing on Shien. +1 use per long rest.',status:'success'},{activity:'Rebel Recruit',result:'DC 17 pending.',status:'pending'}],
+      relationships:[{name:'Knight Aelix',role:'Mentor / Jedi Contact',note:'Guided you to the Temple. Something unspoken between him and the Senator.',bond:4,icon:'🟣'},{name:'Kierra',role:'Padawan / Ally',note:'First met you at the Rancor\'s Roost. Growing in confidence.',bond:3,icon:'🟡'},{name:'Colonel Chasid',role:'Rebel Commander',note:'Earned his trust at Veilwatch.',bond:3,icon:'🔴'}],
+      notes:''
+    },
+    {
+      id:'pc2', name:'Character Two', species:"Twi'lek", classLine:'Operative 4 / Sentinel 3',
+      portrait:'🎯', portraitLabel:'Operative', color:'var(--blue)',
+      hp:38, hpMax:44, hpTemp:5,
+      ac:15, initiative:'+5', speed:'35 ft.',
+      fp:4, fpMax:6,
+      str:[10,0],dex:[18,4],con:[12,1],int:[14,2],wis:[14,2],cha:[16,3],
+      saves:[{n:'Strength',m:'+0',p:false},{n:'Dexterity',m:'+7',p:true},{n:'Constitution',m:'+1',p:false},{n:'Intelligence',m:'+5',p:true},{n:'Wisdom',m:'+2',p:false},{n:'Charisma',m:'+3',p:false}],
+      skills:[{n:'Stealth',m:'+7',p:true,exp:true},{n:'Deception',m:'+6',p:true},{n:'Insight',m:'+5',p:true},{n:'Sleight of Hand',m:'+7',p:true,exp:true},{n:'Persuasion',m:'+6',p:true},{n:'Perception',m:'+2',p:false},{n:'Lore',m:'+2',p:false},{n:'Technology',m:'+5',p:true}],
+      forcePowers:[{name:'Force Camouflage',cost:'2 FP',type:'Universal',desc:'Become invisible until you attack or cast a power.'},{name:'Affect Mind',cost:'1 FP',type:'Light',desc:'DC 14 WIS save or creature charmed for 1 minute.'},{name:'Force Sight',cost:'1 FP',type:'Universal',desc:'See through darkness, fog, and illusions for 1 hour.'}],
+      inventory:[{name:'Lightsaber (Silver)',qty:1,wt:'1 kg',rarity:'rare',notes:'Subtle, pale blade'},{name:'Blaster Pistol (Silenced)',qty:2,wt:'.8 kg',rarity:'uncommon',notes:'Disadvantage on Perception to hear firing'},{name:'Disguise Kit',qty:1,wt:'1 kg',rarity:'standard',notes:''}],
+      credits:1350,
+      downtime:[{activity:'Espionage — Crymorah',result:'Confirmed Syndicate on Ryndal IV. Intel to Naresh.',status:'success'},{activity:'Bond Deepening — Aelix',result:'DC 13 passed. Bond Boon: one reroll available.',status:'success'},{activity:'Data Decryption',result:'Partial — one name still redacted.',status:'pending'}],
+      relationships:[{name:'Naresh',role:'Smuggler / Intel Contact',note:'Reliable. His Crymorah tip cost him something.',bond:3,icon:'🟠'},{name:'Knight Aelix',role:'Jedi Contact / Ally',note:'Bond Boon earned.',bond:4,icon:'🟣'},{name:'Senator Allendor',role:'Political Cover',note:'She sees you as an asset. That cuts both ways.',bond:2,icon:'🟢'}],
+      notes:''
+    },
+    {
+      id:'pc3', name:'Character Three', species:'Mirialan', classLine:'Consular 6 / Scholar 1',
+      portrait:'✨', portraitLabel:'Consular', color:'var(--purple)',
+      hp:34, hpMax:40, hpTemp:0,
+      ac:13, initiative:'+1', speed:'30 ft.',
+      fp:8, fpMax:12,
+      str:[8,-1],dex:[12,1],con:[12,1],int:[16,3],wis:[18,4],cha:[14,2],
+      saves:[{n:'Strength',m:'-1',p:false},{n:'Dexterity',m:'+1',p:false},{n:'Constitution',m:'+1',p:false},{n:'Intelligence',m:'+6',p:true},{n:'Wisdom',m:'+7',p:true},{n:'Charisma',m:'+2',p:false}],
+      skills:[{n:'Lore',m:'+6',p:true},{n:'Insight',m:'+7',p:true,exp:true},{n:'Persuasion',m:'+5',p:true},{n:'Medicine',m:'+7',p:true},{n:'Perception',m:'+4',p:false},{n:'Deception',m:'+2',p:false},{n:'Investigation',m:'+6',p:true},{n:'Stealth',m:'+1',p:false}],
+      forcePowers:[{name:'Heal',cost:'1–3 FP',type:'Light',desc:'Restore 1d8 HP per FP spent. Touch range.'},{name:'Force Barrier',cost:'2 FP',type:'Light',desc:'Grant temp HP equal to 2d8 + WIS modifier.'},{name:'Telekinesis',cost:'2 FP',type:'Universal',desc:'Move objects or creatures. Concentration, 10 min.'},{name:'Stun',cost:'2 FP',type:'Universal',desc:'DC 15 CON save or stunned until end of next turn.'},{name:'Foresight',cost:'3 FP',type:'Light',desc:'Advantage on all checks. Cannot be surprised. 8 hours.'}],
+      inventory:[{name:'Lightsaber (Green)',qty:1,wt:'1 kg',rarity:'rare',notes:'Hums near dark side energy'},{name:'Vossar Holocron Fragment',qty:1,wt:'.2 kg',rarity:'legendary',notes:'Partial Ossus map. Encrypted.'},{name:'Archivist\'s Datapad',qty:1,wt:'.3 kg',rarity:'uncommon',notes:'+2 Lore checks on Jedi history'}],
+      credits:420,
+      downtime:[{activity:'Holocron Study — Ossus',result:'Decoded partial coordinates in the Chorlian Drift.',status:'success'},{activity:'Vision Quest',result:'Saw a woman in white on a red planet. Sylos Mir won\'t explain.',status:'success'},{activity:'Mentorship — Vero & Talia',result:'Padawans will cover your exit next mission.',status:'success'}],
+      relationships:[{name:'Master Voska',role:'Jedi Founder / Mentor',note:'He believes the Force guided you here specifically.',bond:4,icon:'🟣'},{name:'Initiate Sylos Mir',role:'Vossar Seer',note:'Has seen you in his visions. Won\'t say what happened.',bond:3,icon:'🟣'},{name:'Kierra',role:'Padawan / Student',note:'A natural teacher. Stepped in where Knights couldn\'t.',bond:4,icon:'🟡'}],
+      notes:''
+    }
+  ],
+  faction: {
+    Resources:25, Morale:40, Influence:30, Military:30, Secrecy:60
+  },
+  events:[
+    {session:1,title:'Veilwatch Extraction',desc:'Rangers defected. Listening post destroyed.',effect:'+10 Morale',positive:true},
+    {session:1,title:'Tebo Station',desc:'Crymorah presence confirmed. Slaves freed.',effect:'+10 Influence',positive:true},
+    {session:2,title:'Public Order Directive',desc:'Imperial Emergency Act 746-22 enacted. Disappearances begin.',effect:'−10 Influence',positive:false},
+    {session:2,title:'Prison Barge X-103',desc:'Detainees extracted. Inquisitor presence confirmed.',effect:'+5 Morale, −5 Secrecy',positive:true},
+    {session:2,title:'Ossus Holocron',desc:'Fragment of Master Varo Xel\'s star map decoded.',effect:'+10 Resources',positive:true}
+  ],
+  ships:[
+    {badge:'sfb-rebel',faction:'Rebel Cell',name:'Harloen Ranger Patrol Craft',cls:"Modified Kom'rk-class Fighter/Transport",ac:14,hp:38,shield:20,regen:'6 (1d6)',speed:'300 ft.',str:[16,3],dex:[14,2],con:[14,2],int:[12,1],wis:[10,0],cha:[8,-1],traits:[{name:"Rangers' Loyalists",desc:'When Colonel Chasid or Captain Celt is aboard, all attack rolls gain +1 and the ship has advantage on saves against being disabled or boarded.'},{name:'Troop Transport',desc:'Carries up to 10 passengers. They may fire from weapon ports as a bonus action when directed.'},{name:'Hardened Hull',desc:'Resistance to ion damage.'}],actions:[{type:'action',name:'Dual Turbolaser Cannons',uses:'',desc:'2 Ranged Ship Attacks: +4 to hit. 1d10+2 energy damage each.'},{type:'action',name:'Concussion Missile Rack',uses:'(3 uses)',desc:'DC 15 Dex save. 2d10+2 energy damage, half on success. Crit: target speed −100 ft.'},{type:'reaction',name:'Cover Formation',uses:'(2 uses)',desc:'When a friendly ship within 60 ft. is targeted, move up to 100 ft. toward it. If adjacent, attacker rerolls and takes lower.'},{type:'reaction',name:'Emergency Dump',uses:'(1 use)',desc:'When damage would drop this ship to 0 HP, eject cargo to reduce damage by 10.'}],pilotNote:'STR/CON or WIS primary. Captain Celt aboard: use his Tactical Ability Check instead of the pilot\'s for one attack per round.'},
+    {badge:'sfb-virellian',faction:'Virellian Allies',name:'Pale Meridian',cls:'Modified YT-1300 Light Freighter',ac:13,hp:52,shield:18,regen:'5 (1d6–1)',speed:'250 ft.',str:[18,4],dex:[12,1],con:[16,3],int:[16,3],wis:[14,2],cha:[14,2],traits:[{name:'Diplomatic Registry',desc:'DC 14 Deception or Persuasion to pass as Virellian trade vessel. DC 11 in Virellian-adjacent systems.'},{name:'Hidden Cargo Bay',desc:'DC 18 Investigation to detect. Hides 8 passengers or 2 tons of cargo.'},{name:'Shielded Manifest',desc:'Advantage on saves vs. ion weapons and slicing attempts.'}],actions:[{type:'action',name:'Concealed Quad Laser Cannons',uses:'',desc:'2 Ranged Ship Attacks: +3 to hit. 1d8+2 energy damage each. Retracting covers costs bonus action on first round.'},{type:'action',name:'Sensor Scrambler Burst',uses:'(2 uses)',desc:'DC 14 INT save. Failure: sensors scrambled — no ranged attacks beyond 100 ft., disadvantage on Perception.'},{type:'reaction',name:"Smuggler's Instinct",uses:'(2 uses)',desc:'DC 13 Piloting check. On success, attacker rolls with disadvantage.'},{type:'reaction',name:'Emergency Hyperdrive',uses:'(1 use/long rest)',desc:'Reaction to taking damage: jump to hyperspace. Requires clear hyperlane.'}],pilotNote:'INT and CHA primary. Mahna Tir: advantage on Piloting checks at full burn. Senator Allendor: Diplomatic Registry DC 11 in Virellian systems.'},
+    {badge:'sfb-vossar',faction:'Vossar Jedi',name:'The Quiet Current',cls:'Modified VCX-100 Light Freighter',ac:14,hp:60,shield:30,regen:'8 (1d8)',speed:'275 ft.',str:[16,3],dex:[14,2],con:[18,4],int:[18,4],wis:[20,5],cha:[16,3],traits:[{name:'Force-Calmed Hull',desc:'Jedi crew may spend a Force Point as a bonus action to restore 1d8 shield points.'},{name:'Encrypted Vossar Comms',desc:'DC 22 Technology to intercept. Imperial scanners disadvantage on detecting comms.'},{name:'Meditation Chamber',desc:'Holocron Study or Force Meditation downtime actions taken in hyperspace. DC −2.'}],actions:[{type:'action',name:'Laser Cannon Battery',uses:'',desc:'3 Ranged Ship Attacks: +6 to hit. 1d8+4 energy damage each. Covers all arcs.'},{type:'action',name:'Ion Disruptor',uses:'(2 uses)',desc:'DC 16 CON save. Failure: 2d6 ion damage + shields suppressed until end of next turn.'},{type:'action',name:'Proton Torpedo',uses:'(4 uses)',desc:'DC 17 Dex save. 4d6+4 energy damage, half on success. Double damage to shields.'},{type:'reaction',name:'Force-Guided Evasion',uses:'(3 uses)',desc:'Force-sensitive crew spends a Force Point: add WIS modifier to AC until start of attacker\'s next turn.'},{type:'reaction',name:'Presence of the Vossar',uses:'(1 use/long rest)',desc:'When a crew member would fall to 0 HP, Aelix (if aboard) reduces that damage to 1 HP.'}],pilotNote:'WIS primary. Force-sensitive pilots use WIS for all Piloting checks. Kierra can activate Force-Calmed Hull even when not piloting.'},
+    {badge:'sfb-rebel',faction:'Rebel Cell',name:'T-65 X-Wing (Fresia Prototype)',cls:'Incom T-65 X-Wing Starfighter',ac:16,hp:24,shield:22,regen:'7 (1d6+1)',speed:'375 ft.',str:[12,1],dex:[18,4],con:[12,1],int:[18,4],wis:[14,2],cha:[10,0],traits:[{name:'S-Foils (Attack Position)',desc:'Bonus action: lock S-foils — advantage on first attack each round. Cruise position: speed 450 ft. but no torpedoes.'},{name:'Astromech Co-Pilot',desc:'Once per round, use astromech INT (+4) instead of your own for a Piloting check or attack roll.'},{name:'Targeting Computer',desc:'Once per combat: free Aim action against a target in visual range for at least one full round.'}],actions:[{type:'action',name:'Quad Laser Cannons',uses:'',desc:'4 Ranged Ship Attacks: +6 to hit. 1d6+4 energy damage each. All 4 hit same target: DC 14 CON save or disadvantage on next attack.'},{type:'action',name:'Proton Torpedo',uses:'(6 uses)',desc:'DC 18 Dex save. 4d8+4 energy damage, half on success. +2d6 vs. capital ships.'},{type:'reaction',name:'Snap Roll',uses:'(3 uses)',desc:'Impose disadvantage on an incoming attack. DC 12 Piloting — failure: move 50 ft. random direction.'},{type:'reaction',name:'Target Lock Override',uses:'(1 use)',desc:'Redirect a missile/torpedo targeting a friendly ship within 300 ft. to yourself instead.'}],pilotNote:'DEX and INT primary. Mahna Tir: advantage on all Piloting checks. Force-sensitive pilots: spend a Force Point to use Targeting Computer without line-of-sight.'}
+  ]
+};
+
+// ═══════════════════════════════════════════════════════
+//  STATE — player-editable, synced to Sheet
+// ═══════════════════════════════════════════════════════
+let STATE = {};  // loaded from Sheet or DEMO
+
+// ═══════════════════════════════════════════════════════
+//  GOOGLE SHEETS API
+// ═══════════════════════════════════════════════════════
+function sheetsURL(range) {
+  return `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?key=${API_KEY}`;
+}
+function sheetsWriteURL() {
+  return `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchUpdate?key=${API_KEY}`;
+}
+
+async function readRange(range) {
+  const r = await fetch(sheetsURL(range));
+  if (!r.ok) throw new Error(`Sheets read failed: ${r.status}`);
+  const d = await r.json();
+  return d.values || [];
+}
+
+async function writeRanges(data) {
+  // data = [{range, values}]
+  const body = { valueInputOption: 'RAW', data };
+  const r = await fetch(sheetsWriteURL(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`Sheets write failed: ${r.status}`);
+}
+
+// ═══════════════════════════════════════════════════════
+//  LOAD FROM SHEET
+//  Expected sheet structure:
+//
+//  Tab "PlayerState" — all player-editable data in one place:
+//  Row 1: headers
+//  Rows 2–4: one row per character
+//  Cols: id | hp | hpTemp | fp | credits | notes
+//  Then additional tabs per character for inventory/downtime/relationships
+// ═══════════════════════════════════════════════════════
+async function loadFromSheet() {
+  setSyncStatus('saving','LOADING...');
+  try {
+    // Read player state
+    const rows = await readRange('PlayerState!A2:F10');
+    // Merge into DEMO base
+    STATE = JSON.parse(JSON.stringify(DEMO));
+    rows.forEach(row => {
+      const id = row[0];
+      const char = STATE.characters.find(c => c.id === id);
+      if (!char) return;
+      if (row[1] !== undefined) char.hp      = parseInt(row[1]) || char.hp;
+      if (row[2] !== undefined) char.hpTemp  = parseInt(row[2]) || 0;
+      if (row[3] !== undefined) char.fp      = parseInt(row[3]) || char.fp;
+      if (row[4] !== undefined) char.credits = parseInt(row[4]) || char.credits;
+      if (row[5] !== undefined) char.notes   = row[5] || '';
+    });
+
+    // Read inventory per character
+    for (const char of STATE.characters) {
+      try {
+        const inv = await readRange(`Inv_${char.id}!A2:E50`);
+        if (inv.length) {
+          char.inventory = inv.map(r => ({
+            name: r[0]||'', qty: parseInt(r[1])||1, wt: r[2]||'',
+            rarity: r[3]||'standard', notes: r[4]||''
+          }));
+        }
+      } catch(e) { /* tab may not exist yet */ }
+
+      // Read downtime
+      try {
+        const dt = await readRange(`DT_${char.id}!A2:C20`);
+        if (dt.length) {
+          char.downtime = dt.map(r => ({
+            activity: r[0]||'', result: r[1]||'', status: r[2]||'pending'
+          }));
+        }
+      } catch(e) {}
+
+      // Read relationships (just bond levels — DM controls the rest)
+      try {
+        const rels = await readRange(`Rel_${char.id}!A2:B20`);
+        rels.forEach(r => {
+          const rel = char.relationships.find(x => x.name === r[0]);
+          if (rel && r[1]) rel.bond = parseInt(r[1]) || rel.bond;
+        });
+      } catch(e) {}
+    }
+
+    setSyncStatus('synced', 'SYNCED');
+    return true;
+  } catch(e) {
+    setSyncStatus('error','LOAD ERROR');
+    console.error(e);
+    return false;
+  }
+}
+
+async function saveToSheet() {
+  if (DEMO_MODE) return;
+  setSyncStatus('saving','SAVING...');
+  try {
+    const data = [];
+
+    // PlayerState
+    const psRows = STATE.characters.map(c =>
+      [c.id, c.hp, c.hpTemp, c.fp, c.credits, c.notes]
+    );
+    data.push({ range: 'PlayerState!A2', values: psRows });
+
+    // Inventory per character
+    for (const char of STATE.characters) {
+      const invRows = char.inventory.map(i => [i.name, i.qty, i.wt, i.rarity, i.notes]);
+      data.push({ range: `Inv_${char.id}!A2`, values: invRows });
+
+      // Downtime
+      const dtRows = char.downtime.map(d => [d.activity, d.result, d.status]);
+      data.push({ range: `DT_${char.id}!A2`, values: dtRows });
+
+      // Relationships — only bond levels
+      const relRows = char.relationships.map(r => [r.name, r.bond]);
+      data.push({ range: `Rel_${char.id}!A2`, values: relRows });
+    }
+
+    await writeRanges(data);
+    setSyncStatus('synced','SYNCED');
+  } catch(e) {
+    setSyncStatus('error','SAVE ERROR');
+    console.error(e);
+  }
+}
+
+function scheduleSave() {
+  clearTimeout(SAVE_TIMER);
+  setSyncStatus('saving','UNSAVED');
+  SAVE_TIMER = setTimeout(saveToSheet, 1500);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SYNC UI
+// ═══════════════════════════════════════════════════════
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  dot.className = 'sync-dot ' + state;
+  lbl.textContent = label;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════
+function openConfig() {
+  document.getElementById('sheetId').value = SHEET_ID;
+  document.getElementById('apiKey').value = API_KEY;
+  document.getElementById('setupModal').classList.remove('hidden');
+}
+
+async function saveConfig() {
+  const id  = document.getElementById('sheetId').value.trim();
+  const key = document.getElementById('apiKey').value.trim();
+  const err = document.getElementById('setupError');
+  err.classList.remove('visible');
+
+  if (!id || !key) {
+    err.textContent = 'Both fields are required.';
+    err.classList.add('visible');
+    return;
+  }
+
+  SHEET_ID = id;
+  API_KEY  = key;
+  DEMO_MODE = false;
+  localStorage.setItem('sw5e_sheet_id', id);
+  localStorage.setItem('sw5e_api_key',  key);
+
+  document.getElementById('setupModal').classList.add('hidden');
+  document.getElementById('loadingScreen').classList.remove('hidden');
+
+  const ok = await loadFromSheet();
+  document.getElementById('loadingScreen').classList.add('hidden');
+
+  if (!ok) {
+    err.textContent = 'Could not load from that Sheet. Check your ID and API key, and make sure the Sheet is shared with "Anyone with the link can view."';
+    err.classList.add('visible');
+    document.getElementById('setupModal').classList.remove('hidden');
+  } else {
+    renderApp();
+  }
+}
+
+function loadDemo() {
+  DEMO_MODE = true;
+  STATE = JSON.parse(JSON.stringify(DEMO));
+  document.getElementById('setupModal').classList.add('hidden');
+  document.getElementById('loadingScreen').classList.add('hidden');
+  setSyncStatus('', 'DEMO MODE');
+  renderApp();
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER HELPERS
+// ═══════════════════════════════════════════════════════
+function m(v){ return v[1]>=0?`+${v[1]}`:String(v[1]); }
+
+function renderCharPage(char) {
+  const fpPips = Array.from({length: char.fpMax}, (_,i) =>
+    `<div class="fp-pip${i<char.fp?' filled':''}" onclick="toggleFP('${char.id}',${i})"></div>`
+  ).join('');
+
+  const abilities = Object.entries({STR:char.str,DEX:char.dex,CON:char.con,INT:char.int,WIS:char.wis,CHA:char.cha})
+    .map(([n,v]) => `<div class="ability-box"><div class="ability-name">${n}</div><div class="ability-score">${v[0]}</div><div class="ability-mod">${m(v)}</div></div>`).join('');
+
+  const saves = char.saves.map(s =>
+    `<div class="skill-row"><div class="skill-pip${s.p?' prof':''}"></div><span>${s.n}</span><span class="skill-val">${s.m}</span></div>`).join('');
+
+  const skills = char.skills.map(s =>
+    `<div class="skill-row"><div class="skill-pip${s.exp?' exp':s.p?' prof':''}"></div><span>${s.n}</span><span class="skill-val">${s.m}</span></div>`).join('');
+
+  const powers = char.forcePowers.map(p =>
+    `<div class="power-row"><div><div class="power-name">${p.name}</div><div class="power-desc">${p.desc}</div></div><div class="power-cost">${p.cost}</div><div class="power-type">${p.type}</div></div>`).join('');
+
+  const rc = {standard:'r-standard',uncommon:'r-uncommon',rare:'r-rare',legendary:'r-legendary'};
+  const inventory = char.inventory.map((item,idx) =>
+    `<tr><td>${item.name}</td><td>${item.qty}</td><td>${item.wt}</td><td><span class="rarity ${rc[item.rarity]||'r-standard'}">${item.rarity}</span></td><td style="color:var(--text-dim);font-size:11px">${item.notes}</td><td><button class="del-btn" onclick="deleteItem('${char.id}',${idx})" title="Remove">×</button></td></tr>`).join('');
+
+  const ds = {success:'s-success',pending:'s-pending',fail:'s-fail'};
+  const downtime = char.downtime.map((d,idx) =>
+    `<div class="dt-card">
+      <div>
+        <div class="dt-activity editable" onclick="editDT('${char.id}',${idx},'activity',this)">${d.activity}</div>
+        <div class="dt-result editable" onclick="editDT('${char.id}',${idx},'result',this)">${d.result}</div>
+      </div>
+      <button class="dt-status-btn ${ds[d.status]}" onclick="cycleDTStatus('${char.id}',${idx})">${d.status.toUpperCase()}</button>
+      <button class="del-btn" onclick="deleteDT('${char.id}',${idx})">×</button>
+    </div>`).join('');
+
+  const relationships = char.relationships.map((r,ri) => {
+    const pips = Array.from({length:5},(_,i) =>
+      `<div class="bond-pip${i<r.bond?' filled':''}" onclick="setBond('${char.id}',${ri},${i+1})"></div>`).join('');
+    return `<div class="rel-row">
+      <div class="rel-icon">${r.icon}</div>
+      <div>
+        <div class="rel-name">${r.name}</div>
+        <div class="rel-role">${r.role}</div>
+        <div class="rel-note editable" onclick="editRelNote('${char.id}',${ri},this)">${r.note}</div>
+        <div class="bond-meter">${pips}</div>
+      </div>
+    </div>`;}).join('');
+
+  return `<div class="char-layout">
+    <aside class="char-sidebar">
+      <div class="char-portrait">${char.portrait}<div class="portrait-label">${char.portraitLabel}</div></div>
+      <div>
+        <div class="char-name">${char.name}</div>
+        <div class="char-species">${char.species}</div>
+        <div class="char-class-line">${char.classLine}</div>
+      </div>
+      <div class="sidebar-block">
+        <div class="block-label">Hit Points</div>
+        <div class="hp-editor">
+          <button class="hp-btn" onclick="adjustHP('${char.id}',-1)">−</button>
+          <div class="hp-display">
+            <span class="hp-current" onclick="setHP('${char.id}')" title="Click to set">${char.hp}</span>
+            <span class="hp-sep">/</span>
+            <span class="hp-max">${char.hpMax}</span>
+          </div>
+          <button class="hp-btn" onclick="adjustHP('${char.id}',1)">+</button>
+        </div>
+        <div class="temp-hp" onclick="setTempHP('${char.id}')">${char.hpTemp ? `+${char.hpTemp} temp` : '+ Add temp HP'}</div>
+      </div>
+      <div class="sidebar-block">
+        <div class="block-label">Force Points</div>
+        <div class="fp-display">${char.fp} / ${char.fpMax}</div>
+        <div class="fp-pips">${fpPips}</div>
+      </div>
+      <div class="sidebar-block">
+        <div class="block-label">Combat</div>
+        <div class="mini-grid">
+          <div class="mini-stat"><div class="mini-val">${char.ac}</div><div class="mini-lbl">AC</div></div>
+          <div class="mini-stat"><div class="mini-val">${char.initiative}</div><div class="mini-lbl">Init</div></div>
+          <div class="mini-stat" style="grid-column:1/-1"><div class="mini-val">${char.speed}</div><div class="mini-lbl">Speed</div></div>
+        </div>
+      </div>
+    </aside>
+    <div class="char-main">
+      <div class="sheet-section">
+        <div class="sheet-section-header"><span class="sheet-section-title">Ability Scores</span></div>
+        <div class="sheet-section-body"><div class="ability-grid">${abilities}</div></div>
+      </div>
+      <div class="sheet-section">
+        <div class="sheet-section-header"><span class="sheet-section-title">Saves &amp; Skills</span></div>
+        <div class="sheet-section-body">
+          <div class="saves-skills-grid"><div><div class="block-label" style="margin-bottom:6px">Saving Throws</div><div class="skill-list">${saves}</div></div><div><div class="block-label" style="margin-bottom:6px">Skills</div><div class="skill-list">${skills}</div></div></div>
+          <div style="margin-top:.6rem;font-family:var(--font-m);font-size:9px;color:var(--text-muted)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:4px"></span>Proficient &nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px"></span>Expertise</div>
+        </div>
+      </div>
+      ${char.forcePowers.length ? `<div class="sheet-section">
+        <div class="sheet-section-header"><span class="sheet-section-title">Force Powers</span></div>
+        <div class="sheet-section-body">${powers}</div>
+      </div>` : ''}
+      <div class="sheet-section">
+        <div class="sheet-section-header">
+          <span class="sheet-section-title">Inventory</span>
+          <button class="section-add-btn" onclick="addItem('${char.id}')">+ Add item</button>
+        </div>
+        <div class="sheet-section-body">
+          <table class="inv-table"><thead><tr><th>Item</th><th>Qty</th><th>Wt</th><th>Rarity</th><th>Notes</th><th></th></tr></thead><tbody>${inventory}</tbody></table>
+          <div class="credits-row">
+            <span class="credits-val editable" onclick="setCredits('${char.id}')" title="Click to edit">${char.credits.toLocaleString()}</span>
+            <span class="credits-lbl">credits</span>
+          </div>
+        </div>
+      </div>
+      <div class="sheet-section">
+        <div class="sheet-section-header">
+          <span class="sheet-section-title">Downtime</span>
+          <button class="section-add-btn" onclick="addDT('${char.id}')">+ Add entry</button>
+        </div>
+        <div class="sheet-section-body"><div class="dt-list">${downtime}</div></div>
+      </div>
+      <div class="sheet-section">
+        <div class="sheet-section-header"><span class="sheet-section-title">Relationships &amp; Bonds</span></div>
+        <div class="sheet-section-body">
+          <div class="rel-list">${relationships}</div>
+          <div style="margin-top:.6rem;font-family:var(--font-m);font-size:9px;color:var(--text-muted)">Click pips to adjust bond strength &nbsp;·&nbsp; 3+ = Bond Boon available</div>
+        </div>
+      </div>
+      <div class="sheet-section">
+        <div class="sheet-section-header"><span class="sheet-section-title">Notes</span></div>
+        <div class="sheet-section-body">
+          <textarea class="notes-area" placeholder="Session notes, quest reminders, things to ask the DM..." oninput="updateNotes('${char.id}',this.value)">${char.notes}</textarea>
+          <div class="save-note">Changes save automatically</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderOpsPage() {
+  const fColors = {Resources:'var(--amber)',Morale:'var(--green)',Influence:'var(--purple)',Military:'var(--red)',Secrecy:'var(--blue)'};
+  const fDesc   = {Resources:'Credits, supplies, safe houses',Morale:'Cell cohesion & will to fight',Influence:'Public & political reach',Military:'Combat strength & readiness',Secrecy:'How hidden the cell remains'};
+  const fStats = Object.entries(STATE.faction).map(([k,v]) =>
+    `<div class="ops-stat-card"><div class="ops-stat-header"><span class="ops-stat-name">${k}</span><span class="ops-stat-val" style="color:${fColors[k]}">${v}</span></div><div class="ops-bar"><div class="ops-bar-fill" style="width:${Math.min(v,100)}%;background:${fColors[k]}"></div></div><div class="ops-stat-sub">${fDesc[k]}</div></div>`).join('');
+
+  const ds = {success:'s-success',pending:'s-pending',fail:'s-fail'};
+  const charDT = STATE.characters.map(c => {
+    const cards = c.downtime.map((d,idx) =>
+      `<div class="dt-card"><div><div class="dt-activity">${d.activity}</div><div class="dt-result" style="font-size:11px;color:var(--text-dim);margin-top:2px">${d.result}</div></div><span class="dt-status-btn ${ds[d.status]}" style="cursor:default">${d.status.toUpperCase()}</span></div>`).join('');
+    return `<div class="ops-char-block"><div class="ops-char-label" style="color:${c.color}">${c.name}</div><div class="downtime-grid">${cards}</div></div>`;
+  }).join('');
+
+  const events = STATE.events.map(e =>
+    `<div class="event-row"><div class="event-session">Sess. ${e.session}</div><div><div class="event-title">${e.title}</div><div class="event-desc">${e.desc}</div></div><span class="event-effect ${e.positive?'effect-pos':'effect-neg'}">${e.effect}</span></div>`).join('');
+
+  return `<div class="ops-page">
+    <div style="margin-bottom:1.1rem"><div class="page-title">Operations</div><div class="page-sub">REBEL CELL — DOWNTIME LOG &amp; FACTION STATUS</div></div>
+    <div class="sheet-section"><div class="sheet-section-header"><span class="sheet-section-title">Cell Faction Stats</span></div><div class="sheet-section-body"><div class="ops-stats-grid">${fStats}</div><div style="margin-top:.6rem;font-family:var(--font-m);font-size:9px;color:var(--text-muted);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div>
+    <div class="sheet-section"><div class="sheet-section-header"><span class="sheet-section-title">Downtime Log — Current Arc</span></div><div class="sheet-section-body">${charDT}</div></div>
+    <div class="sheet-section"><div class="sheet-section-header"><span class="sheet-section-title">Galactic Event Log</span></div><div class="sheet-section-body"><div class="event-list">${events}</div></div></div>
+  </div>`;
+}
+
+function renderShipsPage() {
+  const cards = STATE.ships.map((s,i) => {
+    const uid = `ship${i}`;
+    const abs = [['STR',s.str],['DEX',s.dex],['CON',s.con],['INT',s.int],['WIS',s.wis],['CHA',s.cha]];
+    const acts   = s.actions.filter(a=>a.type==='action');
+    const reacts = s.actions.filter(a=>a.type==='reaction');
+    return `<div class="ship-card">
+      <div class="ship-card-header"><span class="ship-faction-badge ${s.badge}">${s.faction}</span><div class="ship-name">${s.name}</div><div class="ship-class">${s.cls}</div></div>
+      <div class="ship-tabs"><button class="ship-tab active" onclick="shipTab(this,'${uid}_s','${uid}')">Stats</button><button class="ship-tab" onclick="shipTab(this,'${uid}_w','${uid}')">Weapons</button><button class="ship-tab" onclick="shipTab(this,'${uid}_p','${uid}')">Pilot</button></div>
+      <div id="${uid}">
+        <div class="ship-pane active" id="${uid}_s">
+          <div class="ship-stat-row"><div class="ship-stat"><div class="sstat-val">${s.ac}</div><div class="sstat-lbl">AC</div></div><div class="ship-stat"><div class="sstat-val">${s.hp}</div><div class="sstat-lbl">HP</div></div><div class="ship-stat"><div class="sstat-val">${s.shield}</div><div class="sstat-lbl">Shields</div></div><div class="ship-stat"><div class="sstat-val">${s.regen}</div><div class="sstat-lbl">Regen</div></div><div class="ship-stat"><div class="sstat-val">${s.speed}</div><div class="sstat-lbl">Speed</div></div></div>
+          <div class="ship-bar-labels"><span>Hull</span><span>${s.hp} HP</span></div><div class="ship-bar"><div class="ship-bar-fill bar-hp-fill" style="width:${Math.round(s.hp/80*100)}%"></div></div>
+          <div class="ship-bar-labels"><span>Shields</span><span>${s.shield} SP</span></div><div class="ship-bar"><div class="ship-bar-fill bar-sp-fill" style="width:${Math.round(s.shield/50*100)}%"></div></div>
+          <div class="ship-abilities">${abs.map(([n,v])=>`<div class="sab"><div class="sab-name">${n}</div><div class="sab-score">${v[0]}</div><div class="sab-mod">${m(v)}</div></div>`).join('')}</div>
+          <div class="ship-sec-label">Ship Traits</div>
+          ${s.traits.map(t=>`<div class="ship-trait"><strong>${t.name}.</strong> ${t.desc}</div>`).join('')}
+        </div>
+        <div class="ship-pane" id="${uid}_w">
+          <div class="ship-sec-label">Actions</div>${acts.map(a=>`<div class="ship-action"><div class="ship-action-header"><span class="ship-action-name">${a.name}</span><span class="ship-action-uses">${a.uses}</span><span class="ship-action-type">Action</span></div><div class="ship-action-desc">${a.desc}</div></div>`).join('')}
+          <div class="ship-sec-label" style="margin-top:.9rem">Reactions</div>${reacts.map(a=>`<div class="ship-action"><div class="ship-action-header"><span class="ship-action-name">${a.name}</span><span class="ship-action-uses">${a.uses}</span><span class="ship-action-type">Reaction</span></div><div class="ship-action-desc">${a.desc}</div></div>`).join('')}
+        </div>
+        <div class="ship-pane" id="${uid}_p"><div class="ship-pilot-note"><strong>Pilot Guidance</strong>${s.pilotNote}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="ships-page">
+    <div style="padding:1.25rem 0 1rem"><div class="page-title">Cell Ships</div><div class="page-sub">REBEL ALLIANCE — REGISTERED VESSELS</div></div>
+    <div class="ships-grid">${cards}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  INTERACTIVE ACTIONS
+// ═══════════════════════════════════════════════════════
+function getChar(id){ return STATE.characters.find(c=>c.id===id); }
+function rerender(){ renderApp(false); }
+
+function adjustHP(id, delta) {
+  const c = getChar(id);
+  c.hp = Math.max(0, Math.min(c.hpMax, c.hp + delta));
+  scheduleSave(); rerender();
+}
+function setHP(id) {
+  const c = getChar(id);
+  const v = prompt(`Set HP for ${c.name} (max ${c.hpMax}):`, c.hp);
+  if (v === null) return;
+  c.hp = Math.max(0, Math.min(c.hpMax, parseInt(v)||0));
+  scheduleSave(); rerender();
+}
+function setTempHP(id) {
+  const c = getChar(id);
+  const v = prompt('Temp HP:', c.hpTemp||0);
+  if (v === null) return;
+  c.hpTemp = Math.max(0, parseInt(v)||0);
+  scheduleSave(); rerender();
+}
+function toggleFP(id, index) {
+  const c = getChar(id);
+  c.fp = (index < c.fp) ? index : index + 1;
+  c.fp = Math.max(0, Math.min(c.fpMax, c.fp));
+  scheduleSave(); rerender();
+}
+function setCredits(id) {
+  const c = getChar(id);
+  const v = prompt('Credits:', c.credits);
+  if (v === null) return;
+  c.credits = Math.max(0, parseInt(v.replace(/,/g,''))||0);
+  scheduleSave(); rerender();
+}
+function addItem(id) {
+  const c = getChar(id);
+  const name = prompt('Item name:');
+  if (!name) return;
+  const qty  = parseInt(prompt('Quantity:', '1'))||1;
+  const wt   = prompt('Weight:', '—')||'—';
+  const rar  = prompt('Rarity (standard/uncommon/rare/legendary):', 'standard')||'standard';
+  const note = prompt('Notes:', '')||'';
+  c.inventory.push({name,qty,wt,rarity:rar,notes:note});
+  scheduleSave(); rerender();
+}
+function deleteItem(id, idx) {
+  if (!confirm('Remove this item?')) return;
+  getChar(id).inventory.splice(idx,1);
+  scheduleSave(); rerender();
+}
+function addDT(id) {
+  const activity = prompt('Downtime activity:');
+  if (!activity) return;
+  const result = prompt('Result / notes:', 'Pending...')||'Pending...';
+  getChar(id).downtime.push({activity, result, status:'pending'});
+  scheduleSave(); rerender();
+}
+function deleteDT(id, idx) {
+  if (!confirm('Remove this entry?')) return;
+  getChar(id).downtime.splice(idx,1);
+  scheduleSave(); rerender();
+}
+function editDT(id, idx, field, el) {
+  const c = getChar(id);
+  const v = prompt(`Edit ${field}:`, c.downtime[idx][field]);
+  if (v === null) return;
+  c.downtime[idx][field] = v;
+  scheduleSave(); rerender();
+}
+function cycleDTStatus(id, idx) {
+  const order = ['pending','success','fail'];
+  const c = getChar(id);
+  const cur = c.downtime[idx].status;
+  c.downtime[idx].status = order[(order.indexOf(cur)+1)%order.length];
+  scheduleSave(); rerender();
+}
+function setBond(id, ri, val) {
+  const c = getChar(id);
+  c.relationships[ri].bond = (c.relationships[ri].bond === val) ? val-1 : val;
+  scheduleSave(); rerender();
+}
+function editRelNote(id, ri, el) {
+  const c = getChar(id);
+  const v = prompt('Edit note:', c.relationships[ri].note);
+  if (v === null) return;
+  c.relationships[ri].note = v;
+  scheduleSave(); rerender();
+}
+function updateNotes(id, val) {
+  getChar(id).notes = val;
+  scheduleSave();
+}
+function shipTab(btn, paneId, uid) {
+  const card = btn.closest('.ship-card');
+  card.querySelectorAll('.ship-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(uid).querySelectorAll('.ship-pane').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(paneId).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  NAV & ROUTING
+// ═══════════════════════════════════════════════════════
+let ACTIVE_PAGE = null;
+
+function renderApp(resetPage=true) {
+  const nav = document.getElementById('mainNav');
+  const container = document.getElementById('pageContainer');
+  if (resetPage) ACTIVE_PAGE = 'char_' + STATE.characters[0].id;
+
+  let navHTML = '';
+  STATE.characters.forEach((c,i) => {
+    const active = ACTIVE_PAGE === 'char_'+c.id ? ' active' : '';
+    navHTML += `<button class="nav-btn${active}" onclick="showPage('char_${c.id}',this)">${c.name.split(' ')[0]}</button>`;
+  });
+  navHTML += '<div class="nav-divider"></div>';
+  navHTML += `<button class="nav-btn${ACTIVE_PAGE==='operations'?' active':''}" onclick="showPage('operations',this)">Operations</button>`;
+  navHTML += `<button class="nav-btn${ACTIVE_PAGE==='ships'?' active':''}" onclick="showPage('ships',this)">Ships</button>`;
+  nav.innerHTML = navHTML;
+
+  let pages = '';
+  STATE.characters.forEach(c => {
+    const active = ACTIVE_PAGE === 'char_'+c.id ? ' active' : '';
+    pages += `<div class="page${active}" id="page_char_${c.id}">${renderCharPage(c)}</div>`;
+  });
+  pages += `<div class="page${ACTIVE_PAGE==='operations'?' active':''}" id="page_operations">${renderOpsPage()}</div>`;
+  pages += `<div class="page${ACTIVE_PAGE==='ships'?' active':''}" id="page_ships">${renderShipsPage()}</div>`;
+  container.innerHTML = pages;
+
+  document.getElementById('app').style.display = 'block';
+}
+
+function showPage(id, btn) {
+  ACTIVE_PAGE = id;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const pg = document.getElementById('page_'+id);
+  if (pg) pg.classList.add('active');
+  btn.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════
+(function boot() {
+  const savedId  = localStorage.getItem('sw5e_sheet_id');
+  const savedKey = localStorage.getItem('sw5e_api_key');
+
+  if (savedId && savedKey) {
+    SHEET_ID = savedId;
+    API_KEY  = savedKey;
+    document.getElementById('setupModal').classList.add('hidden');
+    document.getElementById('loadingScreen').classList.remove('hidden');
+    loadFromSheet().then(ok => {
+      document.getElementById('loadingScreen').classList.add('hidden');
+      if (ok) { renderApp(); }
+      else {
+        STATE = JSON.parse(JSON.stringify(DEMO));
+        setSyncStatus('error','SHEET ERROR — DEMO MODE');
+        renderApp();
+      }
+    });
+  } else {
+    document.getElementById('loadingScreen').classList.add('hidden');
+  }
+})();
+</script>
+</body>
+</html>
