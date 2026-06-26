@@ -332,7 +332,12 @@ table.wpn tr:last-child td{border-bottom:none}
     <div class="brand-eye">SW5e — OT Era Campaign</div>
     <div class="brand-name">Cell Registry</div>
   </div>
-  <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
+    <span id="authlabel" style="font-family:var(--fm);font-size:9px;color:var(--txt2);letter-spacing:.08em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <span id="dmbadge" style="display:none;font-family:var(--fm);font-size:8px;letter-spacing:.1em;text-transform:uppercase;background:rgba(212,135,58,.10);border:1px solid rgba(212,135,58,.20);color:var(--amber);padding:2px 7px;border-radius:2px">DM</span>
+    <button id="authbtn" onclick="window.doSignIn&&window.doSignIn()" style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid rgba(212,135,58,.26);border-radius:2px;color:var(--txt3);padding:4px 10px;cursor:pointer">Sign in</button>
+  </div>
 </header>
 <nav class="nav" id="nav"></nav>
 <main id="pages"></main>
