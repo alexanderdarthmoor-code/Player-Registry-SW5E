@@ -7,9 +7,6 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-const DM_EMAIL = "alexander.darthmoor@gmail.com";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB7N0A8eBdQVRhnD57GFOhdSNSR75yZLZg",
@@ -22,80 +19,29 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
-
-// ── Auth state ─────────────────────────────────────────────────────────────
-let currentUser = null;
-window.isDM = () => currentUser && currentUser.email === DM_EMAIL;
-window.isAuthed = () => !!currentUser;
-
-window.requireAuth = function() {
-  if (currentUser) return true;
-  if (confirm("Sign in with Google to make changes?")) {
-    signInWithRedirect(auth, provider);
-  }
-  return false;
-};
-
-window.requireDM = function() {
-  if (window.isDM()) return true;
-  alert("Only the DM can edit this.");
-  return false;
-};
-
-window.doSignIn = () => signInWithRedirect(auth, provider);
-window.doSignOut = () => signOut(auth);
-
-function updateAuthUI(user) {
-  currentUser = user;
-  const btn = document.getElementById("authbtn");
-  const label = document.getElementById("authlabel");
-  const badge = document.getElementById("dmbadge");
-  if (!btn) return;
-  if (user) {
-    if (label) label.textContent = user.displayName || user.email;
-    btn.textContent = "Sign out";
-    btn.onclick = () => signOut(auth);
-    if (badge) badge.style.display = window.isDM() ? "inline" : "none";
-  } else {
-    if (label) label.textContent = "";
-    btn.textContent = "Sign in";
-    btn.onclick = () => signInWithRedirect(auth, provider);
-    if (badge) badge.style.display = "none";
-  }
-  if (window.render) window.render();
-}
-
-onAuthStateChanged(auth, user => updateAuthUI(user));
-
-// Handle redirect result on page load
-getRedirectResult(auth)
-  .then(result => { if (result?.user) updateAuthUI(result.user); })
-  .catch(e => console.warn("Redirect result:", e));
 
 // ── Fields that are live-synced per character ──────────────────────────────
 const LIVE_CHAR_FIELDS = ["hp","hpTemp","fp","credits","inv","wpns","dt","rels","notes"];
 
 // ── Push one character's live fields to Firestore ──────────────────────────
 async function pushChar(c) {
-  if (!currentUser) return;
   const payload = {};
-  LIVE_CHAR_FIELDS.forEach(f => { if (c[f] !== undefined) payload[f] = c[f]; });
+  LIVE_CHAR_FIELDS.forEach(f => { payload[f] = c[f]; });
   await setDoc(doc(db, "campaign", "chars_" + c.id), payload, { merge: true });
 }
 
 // ── Push faction stats to Firestore ───────────────────────────────────────
 async function pushFaction() {
-  if (!currentUser) return;
   await setDoc(doc(db, "campaign", "faction"), window.FACTION, { merge: true });
 }
 
+// ── Expose to global scope so existing onclick handlers can call them ──────
 window.fbPushChar = pushChar;
 window.fbPushFaction = pushFaction;
 
-// ── On load: pull Firestore data and set up live listeners ────────────────
+// ── On load: pull Firestore data and merge into chars/FACTION, then render ─
 async function loadFromFirestore() {
+  // Characters
   for (const c of window.chars) {
     try {
       const snap = await getDoc(doc(db, "campaign", "chars_" + c.id));
@@ -105,6 +51,7 @@ async function loadFromFirestore() {
       }
     } catch(e) { console.warn("Could not load char", c.id, e); }
   }
+  // Faction
   try {
     const snap = await getDoc(doc(db, "campaign", "faction"));
     if (snap.exists()) {
@@ -116,9 +63,9 @@ async function loadFromFirestore() {
   } catch(e) { console.warn("Could not load faction", e); }
 
   window.render();
-  const ss = document.getElementById("syncstatus");
-  if (ss) ss.textContent = "LIVE — REBEL ALLIANCE ENCRYPTED";
+  document.getElementById("syncstatus").textContent = "LIVE — REBEL ALLIANCE ENCRYPTED";
 
+  // ── Live listeners: re-render whenever Firestore changes ──────────────
   window.chars.forEach(c => {
     onSnapshot(doc(db, "campaign", "chars_" + c.id), snap => {
       if (!snap.exists()) return;
@@ -138,7 +85,16 @@ async function loadFromFirestore() {
   });
 }
 
-window.addEventListener("appReady", loadFromFirestore);
+// Wait for the page script to set up chars/FACTION, then load
+// Poll until window.chars and window.render are ready, then load
+function waitForApp() {
+  if (window.chars && window.render && window.FACTION) {
+    loadFromFirestore();
+  } else {
+    setTimeout(waitForApp, 50);
+  }
+}
+waitForApp();
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap');
@@ -376,12 +332,7 @@ table.wpn tr:last-child td{border-bottom:none}
     <div class="brand-eye">SW5e — OT Era Campaign</div>
     <div class="brand-name">Cell Registry</div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px">
-    <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
-    <span id="authlabel" style="font-family:var(--fm);font-size:9px;color:var(--txt2);letter-spacing:.08em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-    <span id="dmbadge" style="display:none;font-family:var(--fm);font-size:8px;letter-spacing:.1em;text-transform:uppercase;background:rgba(212,135,58,.10);border:1px solid rgba(212,135,58,.20);color:var(--amber);padding:2px 7px;border-radius:2px">DM</span>
-    <button id="authbtn" style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid rgba(212,135,58,.26);border-radius:2px;color:var(--txt3);padding:4px 10px;cursor:pointer;transition:color .15s,border-color .15s" onmouseover="this.style.color='var(--amber)';this.style.borderColor='rgba(212,135,58,.45)'" onmouseout="this.style.color='var(--txt3)';this.style.borderColor='rgba(212,135,58,.26)'">Sign in</button>
-  </div>
+  <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
 </header>
 <nav class="nav" id="nav"></nav>
 <main id="pages"></main>
@@ -726,10 +677,7 @@ document.getElementById("advrow").style.display="flex";
 window.chars = chars;
 window.FACTION = FACTION;
 window.render = render;
-
-// Signal to the Firebase module that everything is ready
 render();
-window.dispatchEvent(new Event("appReady"));
 </script>
 </body>
 </html>
