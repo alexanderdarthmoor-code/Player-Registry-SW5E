@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cell Registry — SW5e</title>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const DM_EMAIL = "alexander.darthmoor@gmail.com";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB7N0A8eBdQVRhnD57GFOhdSNSR75yZLZg",
+  authDomain: "sw-homebrew.firebaseapp.com",
+  projectId: "sw-homebrew",
+  storageBucket: "sw-homebrew.firebasestorage.app",
+  messagingSenderId: "426994499491",
+  appId: "1:426994499491:web:997aad0b1954fd1293a416"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let currentUser = null;
+
+window.isDM = () => currentUser && currentUser.email === DM_EMAIL;
+window.isAuthed = () => !!currentUser;
+
+window.handleAuth = () => {
+  if (currentUser) {
+    signOut(auth);
+    return;
+  }
+  signInWithPopup(auth, provider)
+    .then(result => updateAuthUI(result.user))
+    .catch(e => {
+      if (e.code === 'auth/popup-blocked') {
+        signInWithRedirect(auth, provider);
+      } else {
+        console.warn("Sign in error:", e.code, e.message);
+      }
+    });
+};
+
+window.requireAuth = function() {
+  if (currentUser) return true;
+  if (confirm("Sign in with Google to make changes?")) {
+    signInWithPopup(auth, provider)
+      .then(result => updateAuthUI(result.user))
+      .catch(e => console.warn("Sign in error:", e.code));
+  }
+  return false;
+};
+
+window.requireDM = function() {
+  if (window.isDM()) return true;
+  alert("Only the DM can edit this.");
+  return false;
+};
+
+function updateAuthUI(user) {
+  currentUser = user;
+  const btn = document.getElementById("authbtn");
+  const label = document.getElementById("authlabel");
+  const badge = document.getElementById("dmbadge");
+  if (!btn) return;
+  if (user) {
+    if (label) label.textContent = user.displayName || user.email;
+    btn.textContent = "Sign out";
+    if (badge) badge.style.display = window.isDM() ? "inline" : "none";
+  } else {
+    if (label) label.textContent = "";
+    btn.textContent = "Sign in";
+    if (badge) badge.style.display = "none";
+  }
+  if (window.render) window.render();
+}
+
+onAuthStateChanged(auth, user => {
+  console.log("onAuthStateChanged fired:", user ? user.email : "null");
+  updateAuthUI(user);
+});
+
+getRedirectResult(auth)
+  .then(result => {
+    console.log("getRedirectResult:", result ? result.user?.email : "null");
+    if (result?.user) updateAuthUI(result.user);
+  })
+  .catch(e => console.warn("Redirect result error:", e.code, e.message));
+
+const LIVE_CHAR_FIELDS = ["hp","hpTemp","fp","credits","inv","wpns","dt","rels","notes"];
+
+async function pushChar(c) {
+  if (!currentUser) return;
+  const payload = {};
+  LIVE_CHAR_FIELDS.forEach(f => { if (c[f] !== undefined) payload[f] = c[f]; });
+  await setDoc(doc(db, "campaign", "chars_" + c.id), payload, { merge: true });
+}
+
+async function pushFaction() {
+  if (!currentUser) return;
+  await setDoc(doc(db, "campaign", "faction"), window.FACTION, { merge: true });
+}
+
+window.fbPushChar = pushChar;
+window.fbPushFaction = pushFaction;
+
+// Codex Firestore sync
+window.fbGetCodex = async function() {
+  try {
+    const snap = await getDoc(doc(db, "campaign", "codex"));
+    if (snap.exists()) return snap.data();
+  } catch(e) { console.warn("Codex load error", e); }
+  return null;
+};
+window.fbSaveCodex = async function(data) {
+  if (!currentUser) return;
+  try { await setDoc(doc(db, "campaign", "codex"), data, { merge: false }); }
+  catch(e) { console.warn("Codex save error", e); }
+};
+
+async function loadFromFirestore() {
+  for (const c of window.chars) {
+    try {
+      const snap = await getDoc(doc(db, "campaign", "chars_" + c.id));
+      if (snap.exists()) {
+        const d = snap.data();
+        LIVE_CHAR_FIELDS.forEach(f => { if (d[f] !== undefined) c[f] = d[f]; });
+      }
+    } catch(e) { console.warn("Could not load char", c.id, e); }
+  }
+  try {
+    const snap = await getDoc(doc(db, "campaign", "faction"));
+    if (snap.exists()) {
+      const d = snap.data();
+      Object.keys(window.FACTION).forEach(k => {
+        if (d[k] !== undefined) window.FACTION[k] = d[k];
+      });
+    }
+  } catch(e) { console.warn("Could not load faction", e); }
+
+  window.render();
+  const ss = document.getElementById("syncstatus");
+  if (ss) ss.textContent = "LIVE — REBEL ALLIANCE ENCRYPTED";
+
+  window.chars.forEach(c => {
+    onSnapshot(doc(db, "campaign", "chars_" + c.id), snap => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      LIVE_CHAR_FIELDS.forEach(f => { if (d[f] !== undefined) c[f] = d[f]; });
+      window.render();
+    });
+  });
+
+  onSnapshot(doc(db, "campaign", "faction"), snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    Object.keys(window.FACTION).forEach(k => {
+      if (d[k] !== undefined) window.FACTION[k] = d[k];
+    });
+    window.render();
+  });
+}
+
+function waitForApp() {
+  if (window.chars && window.render && window.FACTION) loadFromFirestore();
+  else setTimeout(waitForApp, 50);
+}
+waitForApp();
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;--s1:#0f1014;--s2:#15161b;--s3:#1c1d24;
+  --amber:#d4873a;--adim:#7a4a1a;--aglow:rgba(212,135,58,.10);--ab:rgba(212,135,58,.20);--ab2:rgba(212,135,58,.45);
+  --green:#3dba7e;--blue:#5b9bd5;--red:#d45b5b;--purple:#9b7fe8;
+  --txt:#c8b898;--txt2:#7a6a50;--txt3:#5a5040;--txtb:#f0e4cc;
+  --bdr:rgba(212,135,58,.13);--bdr2:rgba(212,135,58,.26);
+  --fd:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;--fm:'Share Tech Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--fb);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:9999}
+.hdr{border-bottom:1px solid var(--bdr2);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;background:var(--bg);position:sticky;top:0;z-index:100}
+.brand-eye{font-family:var(--fm);font-size:9px;letter-spacing:.2em;color:var(--adim);text-transform:uppercase;margin-bottom:2px}
+.brand-name{font-family:var(--fd);font-size:20px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.stxt{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em}
+.nav{display:flex;gap:2px;padding:0 1.5rem;background:var(--s1);border-bottom:1px solid var(--bdr);overflow-x:auto}
+.nb{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;padding:9px 14px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
+.nb:hover{color:var(--txt)}
+.nb.active{color:var(--amber);border-bottom-color:var(--amber)}
+.ndiv{width:1px;background:var(--bdr);margin:5px 3px;flex-shrink:0}
+.pg{display:none;animation:fi .2s ease}.pg.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.cl{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 108px)}
+.sb{background:var(--s1);border-right:1px solid var(--bdr);padding:1.1rem;display:flex;flex-direction:column;gap:1rem}
+.port{width:100%;aspect-ratio:3/4;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:46px;position:relative;overflow:hidden}
+.plbl{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.75);padding:4px 8px;font-family:var(--fm);font-size:9px;color:var(--amber);letter-spacing:.1em;text-transform:uppercase;text-align:center}
+.sblk{border-top:1px solid var(--bdr);padding-top:.85rem}
+.blbl{font-family:var(--fm);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--adim);margin-bottom:6px}
+.hprow{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.hpbtn{width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr2);background:var(--s2);color:var(--txt);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:border-color .15s,color .15s}
+.hpbtn:hover{border-color:var(--amber);color:var(--amber)}
+.hpnum{font-family:var(--fd);font-size:30px;font-weight:700;line-height:1;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.hpnum:hover{border-color:currentColor}
+.hpsep{font-size:16px;color:var(--txt3);padding:0 2px}
+.hpmax{font-family:var(--fd);font-size:18px;color:var(--txt3);line-height:1}
+.tmphp{font-family:var(--fm);font-size:10px;color:var(--blue);cursor:pointer;letter-spacing:.05em;margin-top:2px}
+.fprow{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.fppip{width:13px;height:13px;border-radius:50%;border:1px solid var(--purple);background:transparent;cursor:pointer;transition:background .15s}
+.fppip.on{background:var(--purple)}
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ms{background:var(--s2);border:1px solid var(--bdr);border-radius:3px;padding:6px 3px;text-align:center}
+.mv{font-family:var(--fd);font-size:17px;font-weight:600;color:var(--txtb);line-height:1}
+.ml{font-family:var(--fm);font-size:8px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.cm{padding:1.1rem 1.5rem;display:flex;flex-direction:column;gap:1rem}
+.sec{background:var(--s1);border:1px solid var(--bdr);border-radius:3px;overflow:hidden}
+.sch{padding:.5rem .9rem;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.sct{font-family:var(--fm);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.abtn{font-family:var(--fm);font-size:9px;color:var(--txt3);background:none;border:1px solid var(--bdr);border-radius:3px;padding:2px 8px;cursor:pointer;letter-spacing:.08em;transition:color .15s,border-color .15s}
+.abtn:hover{color:var(--amber);border-color:var(--ab2)}
+.scb{padding:.85rem .9rem}
+.abg{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.abb{background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:7px 3px;text-align:center}
+.abn{font-family:var(--fm);font-size:8px;color:var(--txt3);letter-spacing:.05em;text-transform:uppercase}
+.absc{font-family:var(--fd);font-size:20px;font-weight:700;color:var(--txtb);line-height:1.1}
+.abm{font-family:var(--fm);font-size:11px;color:var(--amber)}
+.ssg{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.skr{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--txt);margin-bottom:2px}
+.skp{width:7px;height:7px;border-radius:50%;border:1px solid var(--bdr2);flex-shrink:0}
+.skp.pr{background:var(--amber);border-color:var(--amber)}
+.skp.ex{background:var(--green);border-color:var(--green)}
+.skv{font-family:var(--fm);font-size:10px;color:var(--amber);margin-left:auto;min-width:20px;text-align:right}
+.pwr{display:grid;grid-template-columns:1fr auto auto;gap:.6rem;align-items:start;padding:5px 0;border-bottom:1px solid var(--bdr)}
+.pwr:last-child{border-bottom:none}
+.pwn{font-size:13px;font-weight:500;color:var(--txtb)}
+.pwd{font-size:11px;color:var(--txt2);margin-top:2px;line-height:1.4}
+.pwc{font-family:var(--fm);font-size:10px;color:var(--purple);white-space:nowrap}
+.pwt{font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:2px;border:1px solid var(--bdr);color:var(--txt3);white-space:nowrap;text-transform:uppercase}
+table.inv{width:100%;border-collapse:collapse}
+table.inv th{font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);text-align:left;padding:3px 6px;border-bottom:1px solid var(--bdr)}
+table.inv td{font-size:12px;color:var(--txt);padding:4px 6px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+table.inv tr:last-child td{border-bottom:none}
+.rar{font-family:var(--fm);font-size:9px;padding:1px 5px;border-radius:2px}
+.rs{color:var(--txt3);border:1px solid var(--bdr)}
+.ru{color:var(--blue);border:1px solid rgba(91,155,213,.3);background:rgba(91,155,213,.1)}
+.rr{color:var(--purple);border:1px solid rgba(155,127,232,.3);background:rgba(155,127,232,.1)}
+.rl{color:var(--amber);border:1px solid var(--ab);background:var(--aglow)}
+.dbtn{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;padding:0 3px;line-height:1;transition:color .15s}
+.dbtn:hover{color:var(--red)}
+/* Weapons */
+table.wpn{width:100%;border-collapse:collapse}
+table.wpn th{font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);text-align:left;padding:3px 6px;border-bottom:1px solid var(--bdr)}
+table.wpn td{font-size:12px;color:var(--txt);padding:5px 6px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+table.wpn tr:last-child td{border-bottom:none}
+.watk{font-family:var(--fm);font-size:12px;color:var(--green);font-weight:600}
+.wdmg{font-family:var(--fm);font-size:11px;color:var(--amber);cursor:pointer;padding:2px 6px;border-radius:2px;border:1px solid var(--ab);background:var(--aglow);white-space:nowrap;transition:background .15s}
+.wdmg:hover{background:var(--ab)}
+.wtyp{font-family:var(--fm);font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em}
+.crrow{display:flex;align-items:baseline;gap:5px;margin-top:7px}
+.crv{font-family:var(--fd);font-size:21px;font-weight:700;color:var(--amber);line-height:1;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.crv:hover{border-color:var(--amber)}
+.crl{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase}
+.dtc{background:var(--s2);border:1px solid var(--bdr);border-radius:3px;padding:8px 10px;display:grid;grid-template-columns:1fr auto auto;gap:.45rem;align-items:start;margin-bottom:5px}
+.dta{font-size:13px;font-weight:500;color:var(--txtb);cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.dta:hover{border-color:var(--txtb)}
+.dtr{font-size:11px;color:var(--txt2);margin-top:2px;line-height:1.4;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.dtr:hover{border-color:var(--txt2)}
+.dtst{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:2px;cursor:pointer;border:none;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.ss{background:rgba(61,186,126,.12);color:var(--green);border:1px solid rgba(61,186,126,.3)!important}
+.sp{background:var(--aglow);color:var(--amber);border:1px solid var(--ab)!important}
+.sf{background:rgba(212,91,91,.1);color:var(--red);border:1px solid rgba(212,91,91,.3)!important}
+.relr{display:grid;grid-template-columns:30px 1fr;gap:.65rem;align-items:start;padding:7px 0;border-bottom:1px solid var(--bdr)}
+.relr:last-child{border-bottom:none}
+.relic{width:30px;height:30px;border-radius:50%;background:var(--s2);border:1px solid var(--bdr2);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.reln{font-size:13px;font-weight:500;color:var(--txtb)}
+.relro{font-size:11px;color:var(--txt3)}
+.relnote{font-size:11px;color:var(--txt2);margin-top:2px;line-height:1.4;font-style:italic;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.relnote:hover{border-color:var(--txt2)}
+.bondm{display:flex;gap:3px;margin-top:4px}
+.bondp{width:11px;height:4px;border-radius:1px;background:var(--s3);border:1px solid var(--bdr);cursor:pointer;transition:background .15s}
+.bondp.on{background:var(--amber);border-color:var(--amber)}
+.notea{width:100%;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:9px;font-family:var(--fb);font-size:13px;color:var(--txt);line-height:1.6;resize:vertical;min-height:85px;outline:none;transition:border-color .15s}
+.notea:focus{border-color:var(--ab2)}
+.noteh{font-family:var(--fm);font-size:9px;color:var(--txt3);margin-top:3px;letter-spacing:.08em}
+.opspg{padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1.1rem;max-width:1100px}
+.pgt{font-family:var(--fd);font-size:26px;font-weight:700;color:var(--txtb);letter-spacing:.03em}
+.pgs{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;margin-top:3px}
+.fsg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.fsc{background:var(--s2);border:1px solid var(--bdr);border-radius:3px;padding:11px 12px}
+.fsh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.fsk{font-family:var(--fm);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
+.fsv{font-family:var(--fd);font-size:26px;font-weight:700;line-height:1}
+.fsb{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:5px}
+.fsd{font-size:11px;color:var(--txt2);line-height:1.4}
+.ocl{font-family:var(--fd);font-size:14px;font-weight:600;letter-spacing:.03em;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid var(--bdr)}
+.dtg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin-bottom:.9rem}
+.dtgc{background:var(--s2);border:1px solid var(--bdr);border-radius:3px;padding:8px 10px}
+.evr{display:grid;grid-template-columns:58px 1fr auto;gap:.85rem;align-items:start;padding:8px 0;border-bottom:1px solid var(--bdr)}
+.evr:last-child{border-bottom:none}
+.evs{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.09em;text-transform:uppercase;padding-top:2px}
+.evt{font-size:13px;font-weight:500;color:var(--txtb);margin-bottom:2px}
+.evd{font-size:12px;color:var(--txt2);line-height:1.5}
+.eve{font-family:var(--fm);font-size:10px;white-space:nowrap;padding:2px 8px;border-radius:2px}
+.ep{background:rgba(61,186,126,.12);color:var(--green);border:1px solid rgba(61,186,126,.3)}
+.en{background:rgba(212,91,91,.1);color:var(--red);border:1px solid rgba(212,91,91,.3)}
+.shpg{padding:1.1rem 1.5rem;max-width:1400px}
+.shgg{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem}
+.shpc{background:var(--s1);border:1px solid var(--bdr);border-radius:3px;overflow:hidden;position:relative}
+.shpc::before,.shpc::after{content:'';position:absolute;width:10px;height:10px;pointer-events:none;z-index:2}
+.shpc::before{top:-1px;left:-1px;border-top:1px solid var(--amber);border-left:1px solid var(--amber)}
+.shpc::after{bottom:-1px;right:-1px;border-bottom:1px solid var(--amber);border-right:1px solid var(--amber)}
+.shch{padding:.85rem 1rem .7rem;border-bottom:1px solid var(--bdr)}
+.sfb{font-family:var(--fm);font-size:9px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;margin-bottom:7px;display:inline-block}
+.sfbr{background:rgba(212,91,91,.1);color:var(--red);border:1px solid rgba(212,91,91,.25)}
+.sfbv{background:rgba(155,127,232,.1);color:var(--purple);border:1px solid rgba(155,127,232,.25)}
+.sfbvi{background:rgba(61,186,126,.1);color:var(--green);border:1px solid rgba(61,186,126,.25)}
+.shn{font-family:var(--fd);font-size:19px;font-weight:700;color:var(--txtb);letter-spacing:.02em;line-height:1.15}
+.shcl{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.07em;margin-top:2px}
+.shtabs{display:flex;background:var(--bg);border-bottom:1px solid var(--bdr)}
+.shtab{flex:1;padding:7px 3px;font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .15s,border-color .15s}
+.shtab:hover{color:var(--txt)}
+.shtab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.shpn{display:none;padding:.85rem 1rem}.shpn.active{display:block}
+.shsr{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:.65rem}
+.shst{background:var(--s2);border:1px solid var(--bdr);border-radius:3px;padding:6px 3px;text-align:center}
+.sssv{font-family:var(--fd);font-size:15px;font-weight:600;color:var(--amber);line-height:1}
+.sssl{font-family:var(--fm);font-size:7px;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.shbl{display:flex;justify-content:space-between;font-family:var(--fm);font-size:9px;color:var(--txt3);margin-bottom:2px}
+.shb{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:6px}
+.shab{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:.65rem}
+.sab{background:var(--s2);border:1px solid var(--bdr);border-radius:3px;padding:4px 2px;text-align:center}
+.sabn{font-family:var(--fm);font-size:7px;color:var(--txt3)}
+.sabs{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--txtb);line-height:1.2}
+.sabm{font-family:var(--fm);font-size:9px;color:var(--amber)}
+.shsl{font-family:var(--fm);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--adim);border-bottom:1px solid var(--adim);padding-bottom:3px;margin-bottom:7px}
+.shtr{font-size:12px;color:var(--txt);margin-bottom:6px;line-height:1.5}
+.shac{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--bdr)}
+.shac:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.shah{display:flex;align-items:baseline;gap:5px;margin-bottom:2px;flex-wrap:wrap}
+.shan{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--txtb)}
+.shau{font-family:var(--fm);font-size:9px;color:var(--amber)}
+.shat{font-family:var(--fm);font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid var(--bdr);color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-left:auto}
+.shad{font-size:11.5px;color:var(--txt);line-height:1.5}
+.pilotnote{background:var(--s2);border-left:2px solid var(--purple);border-radius:0 3px 3px 0;padding:9px 11px;font-size:12px;line-height:1.65;color:var(--txt)}
+.pilotnote strong{font-family:var(--fm);font-size:8px;color:var(--purple);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:5px}
+@media(max-width:768px){
+  .cl{grid-template-columns:1fr}
+  .sb{border-right:none;border-bottom:1px solid var(--bdr)}
+  .abg{grid-template-columns:repeat(3,1fr)}
+  .ssg{grid-template-columns:1fr}
+  .hdr,.cm,.opspg,.shpg{padding:1rem}
+  .nav{padding:0 .5rem}
+  .evr{grid-template-columns:1fr;gap:.25rem}
+}
+/* Codex */
+.cdx{padding:1.25rem 1.5rem;max-width:1100px}
+.cdx-top{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap}
+.cdx-search{flex:1;min-width:200px;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:7px 12px;font-family:var(--fb);font-size:13px;color:var(--txt);outline:none;transition:border-color .15s}
+.cdx-search:focus{border-color:var(--ab2)}
+.cdx-search::placeholder{color:var(--txt3)}
+.cdx-tabs{display:flex;gap:2px}
+.cdx-tab{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);background:none;border:1px solid var(--bdr);border-radius:3px;padding:5px 12px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.cdx-tab:hover{color:var(--txt);border-color:var(--bdr2)}
+.cdx-tab.active{color:var(--amber);border-color:var(--ab2);background:var(--aglow)}
+.cdx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
+.cdx-card{background:var(--s1);border:1px solid var(--bdr);border-radius:3px;overflow:hidden;position:relative}
+.cdx-card.hidden-entry{opacity:.5}
+.cdx-card-hdr{padding:.65rem .9rem;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px;justify-content:space-between}
+.cdx-card-title{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--txtb);letter-spacing:.02em}
+.cdx-badge{font-family:var(--fm);font-size:8px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap}
+.cdx-card-body{padding:.85rem .9rem}
+.cdx-field{margin-bottom:.6rem}
+.cdx-field:last-child{margin-bottom:0}
+.cdx-field-lbl{font-family:var(--fm);font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--adim);margin-bottom:3px}
+.cdx-field-val{font-size:12px;color:var(--txt);line-height:1.55}
+.cdx-spoiler{background:var(--s3);border:1px solid var(--bdr2);border-radius:3px;padding:10px;text-align:center;cursor:pointer;transition:background .15s}
+.cdx-spoiler:hover{background:var(--s2)}
+.cdx-spoiler-lbl{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.12em;text-transform:uppercase}
+.cdx-spoiler-icon{font-size:18px;margin-bottom:4px;display:block}
+.cdx-actions{display:flex;gap:5px;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--bdr)}
+.cdx-redacted{background:repeating-linear-gradient(45deg,var(--s2),var(--s2) 4px,var(--s3) 4px,var(--s3) 8px);border-radius:3px;padding:12px;text-align:center}
+.cdx-redacted-txt{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.15em;text-transform:uppercase}
+/* Status badges */
+.st-alive{color:var(--green);border:1px solid rgba(61,186,126,.3);background:rgba(61,186,126,.08)}
+.st-missing{color:var(--amber);border:1px solid var(--ab);background:var(--aglow)}
+.st-dead{color:var(--red);border:1px solid rgba(212,91,91,.3);background:rgba(212,91,91,.08)}
+.st-unknown{color:var(--txt3);border:1px solid var(--bdr)}
+/* Org type badges */
+.ot-jedi{color:var(--blue);border:1px solid rgba(91,155,213,.3);background:rgba(91,155,213,.08)}
+.ot-rebel{color:var(--green);border:1px solid rgba(61,186,126,.3);background:rgba(61,186,126,.08)}
+.ot-imperial{color:var(--red);border:1px solid rgba(212,91,91,.3);background:rgba(212,91,91,.08)}
+.ot-criminal{color:var(--purple);border:1px solid rgba(155,127,232,.3);background:rgba(155,127,232,.08)}
+.ot-neutral{color:var(--txt3);border:1px solid var(--bdr)}
+/* Disposition */
+.dp-allied{color:var(--green)}.dp-hostile{color:var(--red)}.dp-neutral{color:var(--txt2)}.dp-unknown{color:var(--txt3)}
+/* Imperial control */
+.ic-none{color:var(--green)}.ic-partial{color:var(--amber)}.ic-occupied{color:var(--red)}.ic-lockdown{color:#ff4444}
+/* Dice Roller */
+#dice-fab{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:var(--amber);border:none;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(212,135,58,.4);z-index:200;transition:transform .15s,box-shadow .15s}
+#dice-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(212,135,58,.55)}
+#dice-panel{position:fixed;bottom:84px;right:24px;width:300px;background:var(--s1);border:1px solid var(--bdr2);border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.6);z-index:199;display:none;flex-direction:column;overflow:hidden}
+#dice-panel.open{display:flex}
+.dp-hdr{padding:.6rem .9rem;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.dp-title{font-family:var(--fm);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.dp-close{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;transition:color .15s}
+.dp-close:hover{color:var(--txt)}
+.dp-dice{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:.75rem .9rem}
+.dp-die{background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:7px 3px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-family:var(--fm);font-size:10px;color:var(--txt3);letter-spacing:.05em}
+.dp-die:hover{border-color:var(--ab2);color:var(--amber);background:var(--aglow)}
+.dp-die.active{border-color:var(--amber);color:var(--amber);background:var(--aglow)}
+.dp-face{font-size:18px;display:block;margin-bottom:2px}
+.dp-adv{display:flex;gap:4px;padding:0 .9rem .65rem}
+.dp-advbtn{flex:1;font-family:var(--fm);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:5px 3px;border-radius:2px;border:1px solid var(--bdr2);background:none;color:var(--txt3);cursor:pointer;transition:all .15s}
+.dp-advbtn:hover{border-color:var(--ab2);color:var(--amber)}
+.dp-advbtn.adv-on{background:rgba(61,186,126,.12);border-color:rgba(61,186,126,.4);color:var(--green)}
+.dp-advbtn.dis-on{background:rgba(212,91,91,.1);border-color:rgba(212,91,91,.3);color:var(--red)}
+.dp-count{display:flex;align-items:center;gap:8px;padding:0 .9rem .65rem}
+.dp-clbl{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase}
+.dp-cbtn{width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr2);background:var(--s2);color:var(--txt);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.dp-cbtn:hover{border-color:var(--amber);color:var(--amber)}
+.dp-cval{font-family:var(--fm);font-size:14px;color:var(--txtb);min-width:18px;text-align:center}
+.dp-roll{margin:.1rem .9rem .75rem;padding:9px;font-family:var(--fm);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--amber);color:var(--bg);border:none;border-radius:3px;cursor:pointer;font-weight:700;transition:opacity .15s}
+.dp-roll:hover{opacity:.88}
+.dp-result{margin:0 .9rem .75rem;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:10px 12px;text-align:center;display:none}
+.dp-result.show{display:block}
+.dp-total{font-family:var(--fd);font-size:40px;font-weight:700;color:var(--amber);line-height:1}
+.dp-total.crit{color:var(--green)}
+.dp-total.fail{color:var(--red)}
+.dp-breakdown{font-family:var(--fm);font-size:10px;color:var(--txt3);margin-top:3px;letter-spacing:.05em}
+.dp-label{font-family:var(--fm);font-size:9px;color:var(--txt2);margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
+.dp-hist{border-top:1px solid var(--bdr);max-height:140px;overflow-y:auto}
+.dp-hrow{display:flex;justify-content:space-between;align-items:baseline;padding:4px .9rem;border-bottom:1px solid var(--bdr);font-family:var(--fm);font-size:10px}
+.dp-hrow:last-child{border-bottom:none}
+.dp-hlbl{color:var(--txt3);font-size:9px}
+.dp-hval{color:var(--amber);font-weight:600}
+.dp-hval.hcrit{color:var(--green)}
+.dp-hval.hfail{color:var(--red)}
+/* Codex Modal */
+.cdx-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:center;justify-content:center;padding:1.5rem}
+.cdx-modal-bg.open{display:flex}
+.cdx-modal{background:var(--s1);border:1px solid var(--bdr2);border-radius:4px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative}
+.cdx-modal-hdr{padding:.85rem 1.1rem;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1}
+.cdx-modal-title{font-family:var(--fd);font-size:22px;font-weight:700;color:var(--txtb);letter-spacing:.02em}
+.cdx-modal-close{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:22px;line-height:1;transition:color .15s}
+.cdx-modal-close:hover{color:var(--txt)}
+.cdx-modal-img{width:100%;max-height:280px;object-fit:cover;object-position:top;display:block}
+.cdx-modal-body{padding:1.1rem}
+.cdx-modal-field{margin-bottom:.9rem}
+.cdx-modal-field:last-child{margin-bottom:0}
+.cdx-modal-lbl{font-family:var(--fm);font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--adim);margin-bottom:4px}
+.cdx-modal-val{font-size:13px;color:var(--txt);line-height:1.7}
+</style>
+<body>
+<header class="hdr">
+  <div>
+    <div class="brand-eye">SW5e — OT Era Campaign</div>
+    <div class="brand-name">Cell Registry</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
+    <span id="authlabel" style="font-family:var(--fm);font-size:9px;color:var(--txt2);letter-spacing:.08em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <span id="dmbadge" style="display:none;font-family:var(--fm);font-size:8px;letter-spacing:.1em;text-transform:uppercase;background:rgba(212,135,58,.10);border:1px solid rgba(212,135,58,.20);color:var(--amber);padding:2px 7px;border-radius:2px">DM</span>
+    <button id="authbtn" onclick="handleAuth()" style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid rgba(212,135,58,.26);border-radius:2px;color:var(--txt3);padding:4px 10px;cursor:pointer">Sign in</button>
+  </div>
+</header>
+<nav class="nav" id="nav"></nav>
+<main id="pages"></main>
+
+<!-- Codex Modal -->
+<div class="cdx-modal-bg" id="cdxModal" onclick="if(event.target===this)closeCodexModal()">
+  <div class="cdx-modal">
+    <div class="cdx-modal-hdr">
+      <span class="cdx-modal-title" id="cdxModalTitle"></span>
+      <button class="cdx-modal-close" onclick="closeCodexModal()">×</button>
+    </div>
+    <div id="cdxModalContent"></div>
+  </div>
+</div>
+
+<!-- Dice Roller -->
+<button id="dice-fab" onclick="toggleDice()" title="Dice Roller">⚄</button>
+<div id="dice-panel">
+  <div class="dp-hdr">
+    <span class="dp-title">Dice Roller — Private</span>
+    <button class="dp-close" onclick="toggleDice()">×</button>
+  </div>
+  <div class="dp-dice">
+    <div class="dp-die" onclick="selDie(4)" id="die4"><span class="dp-face">▲</span>d4</div>
+    <div class="dp-die" onclick="selDie(6)" id="die6"><span class="dp-face">⬡</span>d6</div>
+    <div class="dp-die" onclick="selDie(8)" id="die8"><span class="dp-face">◆</span>d8</div>
+    <div class="dp-die" onclick="selDie(10)" id="die10"><span class="dp-face">⬟</span>d10</div>
+    <div class="dp-die" onclick="selDie(12)" id="die12"><span class="dp-face">⬠</span>d12</div>
+    <div class="dp-die active" onclick="selDie(20)" id="die20"><span class="dp-face">⬡</span>d20</div>
+    <div class="dp-die" onclick="selDie(100)" id="die100"><span class="dp-face">●</span>d100</div>
+    <div class="dp-die" onclick="rollCustom()" id="diecustom"><span class="dp-face">✎</span>custom</div>
+  </div>
+  <div class="dp-count">
+    <span class="dp-clbl">Dice</span>
+    <button class="dp-cbtn" onclick="adjCount(-1)">−</button>
+    <span class="dp-cval" id="dicecount">1</span>
+    <button class="dp-cbtn" onclick="adjCount(1)">+</button>
+  </div>
+  <div class="dp-adv" id="advrow">
+    <button class="dp-advbtn" id="advbtn" onclick="setAdv('adv')">Advantage</button>
+    <button class="dp-advbtn" id="disbtn" onclick="setAdv('dis')">Disadvantage</button>
+    <button class="dp-advbtn" id="norbtn" onclick="setAdv('nor')">Normal</button>
+  </div>
+  <button class="dp-roll" onclick="doRoll()">ROLL</button>
+  <div class="dp-result" id="dpresult">
+    <div class="dp-total" id="dptotal">—</div>
+    <div class="dp-breakdown" id="dpbreak"></div>
+    <div class="dp-label" id="dplabel"></div>
+  </div>
+  <div class="dp-hist" id="dphist"></div>
+</div>
+<script>
+const CHARS=[
+  {id:"pc1",name:"Character One",species:"Human",cls:"Guardian 5 / Scout 2",em:"⚔️",lbl:"Guardian",col:"#d4873a",portrait:"",
+   hp:52,hpMax:52,hpTemp:0,ac:16,init:"+3",spd:"30 ft.",fp:6,fpMax:8,
+   abs:{STR:[16,3],DEX:[14,2],CON:[14,2],INT:[10,0],WIS:[12,1],CHA:[10,0]},
+   saves:[{n:"Strength",m:"+5",p:1},{n:"Dexterity",m:"+2"},{n:"Constitution",m:"+4",p:1},{n:"Intelligence",m:"+0"},{n:"Wisdom",m:"+1"},{n:"Charisma",m:"+0"}],
+   skills:[{n:"Athletics",m:"+5",p:1},{n:"Acrobatics",m:"+2"},{n:"Stealth",m:"+2"},{n:"Perception",m:"+3",p:1},{n:"Insight",m:"+1"},{n:"Persuasion",m:"+0"},{n:"Piloting",m:"+4",p:1},{n:"Lore",m:"+0"}],
+   powers:[{n:"Force Push / Pull",c:"1 FP",t:"Universal",d:"Move a creature or object up to 30 ft."},{n:"Saber Ward",c:"1 FP",t:"Light",d:"+2 to AC until end of your next turn."},{n:"Battle Meditation",c:"2 FP",t:"Light",d:"Allies within 30 ft. gain advantage on one attack roll."}],
+   inv:[{n:"Lightsaber (Blue)",q:1,w:"1 kg",r:"rare",d:"Kyber crystal from Weik"},{n:"Heavy Blaster Pistol",q:1,w:"1 kg",r:"standard",d:""},{n:"Vossar Ranger Cloak",q:1,w:".5 kg",r:"uncommon",d:"+1 Stealth in urban environments"},{n:"Medpac",q:3,w:".5 kg",r:"standard",d:"Restore 2d4+2 HP"}],
+   wpns:[{n:"Lightsaber (Blue)",ab:"STR",prof:1,dmg:"1d8",dtype:"Energy",range:"Melee",notes:"Kyber crystal from Weik"},{n:"Heavy Blaster Pistol",ab:"DEX",prof:1,dmg:"1d8",dtype:"Energy",range:"60/240 ft.",notes:""}],
+   credits:850,
+   dt:[{a:"Force Meditation",r:"Regained 1 FP. Glimpsed a figure in white.",s:"success"},{a:"Form Practice",r:"Focusing on Shien. +1 use per long rest.",s:"success"},{a:"Rebel Recruit",r:"DC 17 check pending.",s:"pending"}],
+   rels:[{n:"Knight Aelix",ro:"Mentor / Jedi Contact",note:"Guided you to the Temple. Something unspoken between him and the Senator.",b:4,ic:"🟣"},{n:"Kierra",ro:"Padawan / Ally",note:"First met you at the Rancor's Roost.",b:3,ic:"🟡"},{n:"Colonel Chasid",ro:"Rebel Commander",note:"Earned his trust at Veilwatch.",b:3,ic:"🔴"},{n:"Queen Celine",ro:"Virellian Patron",note:"Meets you with warmth and careful calculation.",b:2,ic:"🟢"}],
+   notes:""},
+  {id:"pc2",name:"Character Two",species:"Twi'lek",cls:"Operative 4 / Sentinel 3",em:"🎯",lbl:"Operative",col:"#5b9bd5",portrait:"",
+   hp:38,hpMax:44,hpTemp:5,ac:15,init:"+5",spd:"35 ft.",fp:4,fpMax:6,
+   abs:{STR:[10,0],DEX:[18,4],CON:[12,1],INT:[14,2],WIS:[14,2],CHA:[16,3]},
+   saves:[{n:"Strength",m:"+0"},{n:"Dexterity",m:"+7",p:1},{n:"Constitution",m:"+1"},{n:"Intelligence",m:"+5",p:1},{n:"Wisdom",m:"+2"},{n:"Charisma",m:"+3"}],
+   skills:[{n:"Stealth",m:"+7",p:1,e:1},{n:"Deception",m:"+6",p:1},{n:"Insight",m:"+5",p:1},{n:"Sleight of Hand",m:"+7",p:1,e:1},{n:"Persuasion",m:"+6",p:1},{n:"Perception",m:"+2"},{n:"Lore",m:"+2"},{n:"Technology",m:"+5",p:1}],
+   powers:[{n:"Force Camouflage",c:"2 FP",t:"Universal",d:"Invisible until you attack or cast a power."},{n:"Affect Mind",c:"1 FP",t:"Light",d:"DC 14 WIS save or creature charmed 1 minute."},{n:"Force Sight",c:"1 FP",t:"Universal",d:"See through darkness and illusions for 1 hour."}],
+   inv:[{n:"Lightsaber (Silver)",q:1,w:"1 kg",r:"rare",d:"Subtle pale blade from Weik"},{n:"Blaster Pistol (Silenced)",q:2,w:".8 kg",r:"uncommon",d:"Disadvantage on Perception checks to hear firing"},{n:"Disguise Kit",q:1,w:"1 kg",r:"standard",d:""},{n:"Datapad (Sliced)",q:1,w:".3 kg",r:"uncommon",d:"Partial ISB personnel files"}],
+   wpns:[{n:"Lightsaber (Silver)",ab:"DEX",prof:1,dmg:"1d8",dtype:"Energy",range:"Melee",notes:"Finesse"},{n:"Blaster Pistol (Silenced)",ab:"DEX",prof:1,dmg:"1d6",dtype:"Energy",range:"40/160 ft.",notes:"Silent fire"}],
+   credits:1350,
+   dt:[{a:"Espionage — Crymorah",r:"Confirmed Syndicate on Ryndal IV.",s:"success"},{a:"Bond Deepening — Aelix",r:"DC 13 passed. Bond Boon: one reroll.",s:"success"},{a:"Data Decryption",r:"Partial — one name still redacted.",s:"pending"}],
+   rels:[{n:"Naresh",ro:"Smuggler / Intel Contact",note:"His Crymorah tip cost him something. You owe a favor.",b:3,ic:"🟠"},{n:"Knight Aelix",ro:"Jedi Contact / Ally",note:"Bond Boon earned.",b:4,ic:"🟣"},{n:"Senator Allendor",ro:"Political Cover",note:"She sees you as an asset. That cuts both ways.",b:2,ic:"🟢"},{n:"Captain Mahna Tir",ro:"Air Wing Commander",note:"Respects getting in and out without a firefight.",b:3,ic:"🔴"}],
+   notes:""},
+  {id:"pc3",name:"Character Three",species:"Mirialan",cls:"Consular 6 / Scholar 1",em:"✨",lbl:"Consular",col:"#9b7fe8",portrait:"",
+   hp:34,hpMax:40,hpTemp:0,ac:13,init:"+1",spd:"30 ft.",fp:8,fpMax:12,
+   abs:{STR:[8,-1],DEX:[12,1],CON:[12,1],INT:[16,3],WIS:[18,4],CHA:[14,2]},
+   saves:[{n:"Strength",m:"-1"},{n:"Dexterity",m:"+1"},{n:"Constitution",m:"+1"},{n:"Intelligence",m:"+6",p:1},{n:"Wisdom",m:"+7",p:1},{n:"Charisma",m:"+2"}],
+   skills:[{n:"Lore",m:"+6",p:1},{n:"Insight",m:"+7",p:1,e:1},{n:"Persuasion",m:"+5",p:1},{n:"Medicine",m:"+7",p:1},{n:"Perception",m:"+4"},{n:"Deception",m:"+2"},{n:"Investigation",m:"+6",p:1},{n:"Stealth",m:"+1"}],
+   powers:[{n:"Heal",c:"1–3 FP",t:"Light",d:"Restore 1d8 HP per FP. Touch range."},{n:"Force Barrier",c:"2 FP",t:"Light",d:"Temp HP equal to 2d8 + WIS modifier."},{n:"Telekinesis",c:"2 FP",t:"Universal",d:"Move objects or creatures. Concentration 10 min."},{n:"Stun",c:"2 FP",t:"Universal",d:"DC 15 CON save or stunned until end of next turn."},{n:"Foresight",c:"3 FP",t:"Light",d:"Advantage all checks. Cannot be surprised. 8 hours."}],
+   inv:[{n:"Lightsaber (Green)",q:1,w:"1 kg",r:"rare",d:"Hums near dark side energy"},{n:"Vossar Holocron Fragment",q:1,w:".2 kg",r:"legendary",d:"Partial Ossus map. Encrypted."},{n:"Archivist's Datapad",q:1,w:".3 kg",r:"uncommon",d:"+2 Lore on Jedi history"},{n:"Healer's Pack",q:1,w:"1.5 kg",r:"standard",d:"10 uses. Stabilize or 1d4 HP."}],
+   wpns:[{n:"Lightsaber (Green)",ab:"WIS",prof:1,dmg:"1d8",dtype:"Energy",range:"Melee",notes:"Force-attuned"},{n:"Unarmed Strike",ab:"STR",prof:1,dmg:"1d4",dtype:"Kinetic",range:"Melee",notes:""}],
+   credits:420,
+   dt:[{a:"Holocron Study — Ossus",r:"Decoded partial coordinates in the Chorlian Drift.",s:"success"},{a:"Vision Quest",r:"Saw a woman in white on a red planet. Sylos Mir won't explain.",s:"success"},{a:"Mentorship — Vero & Talia",r:"Padawans will cover your exit next mission.",s:"success"}],
+   rels:[{n:"Master Voska",ro:"Jedi Founder / Mentor",note:"He believes the Force guided you here. That weight is real.",b:4,ic:"🟣"},{n:"Initiate Sylos Mir",ro:"Vossar Seer",note:"Has seen you in his visions. Won't say what happened.",b:3,ic:"🟣"},{n:"Kierra",ro:"Padawan / Student",note:"A natural teacher. Stepped in where the Knights couldn't.",b:4,ic:"🟡"},{n:"Queen Celine",ro:"Virellian Patron",note:"Drawn to your Force sensitivity.",b:3,ic:"🟢"}],
+   notes:""}
+];
+const FACTION={Resources:{v:25,col:"#d4873a",d:"Credits, supplies, safe houses"},Morale:{v:40,col:"#3dba7e",d:"Cell cohesion & will to fight"},Influence:{v:30,col:"#9b7fe8",d:"Public & political reach"},Military:{v:30,col:"#d45b5b",d:"Combat strength & readiness"},Secrecy:{v:60,col:"#5b9bd5",d:"How hidden the cell remains"}};
+const EVENTS=[{s:1,t:"Veilwatch Extraction",d:"Rangers defected. Listening post destroyed.",e:"+10 Morale",pos:1},{s:1,t:"Tebo Station",d:"Crymorah confirmed. Slaves freed.",e:"+10 Influence",pos:1},{s:2,t:"Public Order Directive",d:"Imperial Emergency Act 746-22. Disappearances begin.",e:"−10 Influence",pos:0},{s:2,t:"Prison Barge X-103",d:"Detainees extracted. Inquisitor confirmed.",e:"+5 Morale, −5 Secrecy",pos:1},{s:2,t:"Ossus Holocron",d:"Master Varo Xel's star map fragment decoded.",e:"+10 Resources",pos:1}];
+const SHIPS=[
+  {badge:"r",faction:"Rebel Cell",name:"Harloen Ranger Patrol Craft",cls:"Modified Kom'rk-class Fighter/Transport",ac:14,hp:38,sp:20,regen:"6 (1d6)",spd:"300 ft.",abs:[16,14,14,12,10,8],traits:[{n:"Rangers' Loyalists",d:"When Colonel Chasid or Captain Celt is aboard, attack rolls gain +1 and advantage on saves vs. disabled or boarded."},{n:"Troop Transport",d:"Carries up to 10 passengers. They may fire from weapon ports as a bonus action."},{n:"Hardened Hull",d:"Resistance to ion damage."}],actions:[{t:"a",n:"Dual Turbolaser Cannons",u:"",d:"2 Ranged Ship Attacks: +4 to hit. 1d10+2 energy damage each."},{t:"a",n:"Concussion Missile Rack",u:"(3 uses)",d:"DC 15 Dex save. 2d10+2 energy, half on success. Crit: target speed −100 ft."},{t:"r",n:"Cover Formation",u:"(2 uses)",d:"When a friendly ship within 60 ft. is targeted, move up to 100 ft. toward it. If adjacent, attacker rerolls."},{t:"r",n:"Emergency Dump",u:"(1 use)",d:"When damage would drop ship to 0 HP, eject cargo to reduce damage by 10."}],pilot:"STR/CON or WIS primary. Captain Celt aboard: use his Tactical check instead of the pilot's for one attack per round."},
+  {badge:"vi",faction:"Virellian Allies",name:"Pale Meridian",cls:"Modified YT-1300 Light Freighter",ac:13,hp:52,sp:18,regen:"5 (1d6–1)",spd:"250 ft.",abs:[18,12,16,16,14,14],traits:[{n:"Diplomatic Registry",d:"DC 14 Deception or Persuasion to pass as Virellian trade vessel. DC 11 in Virellian-adjacent systems."},{n:"Hidden Cargo Bay",d:"DC 18 Investigation to detect. Hides 8 passengers or 2 tons of cargo."},{n:"Shielded Manifest",d:"Advantage on saves vs. ion weapons and slicing attempts."}],actions:[{t:"a",n:"Concealed Quad Laser Cannons",u:"",d:"2 Ranged Ship Attacks: +3 to hit. 1d8+2 each. Retracting covers costs bonus action first round."},{t:"a",n:"Sensor Scrambler Burst",u:"(2 uses)",d:"DC 14 INT save. Failure: no ranged attacks beyond 100 ft., disadvantage on Perception."},{t:"r",n:"Smuggler's Instinct",u:"(2 uses)",d:"DC 13 Piloting check. On success, attacker rolls with disadvantage."},{t:"r",n:"Emergency Hyperdrive",u:"(1 use/long rest)",d:"Reaction to damage: jump to hyperspace. Requires clear hyperlane."}],pilot:"INT and CHA primary. Mahna Tir: advantage on Piloting at full burn. Senator Allendor: DC 11 in Virellian systems."},
+  {badge:"vo",faction:"Vossar Jedi",name:"The Quiet Current",cls:"Modified VCX-100 Light Freighter",ac:14,hp:60,sp:30,regen:"8 (1d8)",spd:"275 ft.",abs:[16,14,18,18,20,16],traits:[{n:"Force-Calmed Hull",d:"Jedi crew may spend a Force Point as bonus action to restore 1d8 shield points."},{n:"Encrypted Vossar Comms",d:"DC 22 Technology to intercept. Imperial scanners disadvantage detecting comms."},{n:"Meditation Chamber",d:"Holocron Study or Force Meditation taken in hyperspace. DC −2."}],actions:[{t:"a",n:"Laser Cannon Battery",u:"",d:"3 Ranged Ship Attacks: +6 to hit. 1d8+4 each. Covers all arcs."},{t:"a",n:"Ion Disruptor",u:"(2 uses)",d:"DC 16 CON save. Failure: 2d6 ion + shields suppressed until end of next turn."},{t:"a",n:"Proton Torpedo",u:"(4 uses)",d:"DC 17 Dex save. 4d6+4 energy, half on success. Double damage to shields."},{t:"r",n:"Force-Guided Evasion",u:"(3 uses)",d:"Force-sensitive crew spends a Force Point: add WIS modifier to AC until attacker's next turn."},{t:"r",n:"Presence of the Vossar",u:"(1 use/long rest)",d:"When crew would fall to 0 HP, Aelix (if aboard) reduces damage to 1 HP."}],pilot:"WIS primary. Force-sensitive pilots use WIS for all Piloting checks. Kierra can activate Force-Calmed Hull even when not piloting."},
+  {badge:"r",faction:"Rebel Cell",name:"T-65 X-Wing (Fresia Prototype)",cls:"Incom T-65 X-Wing Starfighter",ac:16,hp:24,sp:22,regen:"7 (1d6+1)",spd:"375 ft.",abs:[12,18,12,18,14,10],traits:[{n:"S-Foils (Attack Position)",d:"Bonus action: advantage on first attack each round. Cruise: speed 450 ft., no torpedoes."},{n:"Astromech Co-Pilot",d:"Once per round, use astromech INT (+4) instead of your own for a Piloting check or attack roll."},{n:"Targeting Computer",d:"Once per combat: free Aim action vs. a target in visual range for at least one full round."}],actions:[{t:"a",n:"Quad Laser Cannons",u:"",d:"4 Ranged Ship Attacks: +6 to hit. 1d6+4 each. All 4 hit same target: DC 14 CON save or disadvantage on next attack."},{t:"a",n:"Proton Torpedo",u:"(6 uses)",d:"DC 18 Dex save. 4d8+4 energy, half on success. +2d6 vs. capital ships."},{t:"r",n:"Snap Roll",u:"(3 uses)",d:"Impose disadvantage on incoming attack. DC 12 Piloting — fail: move 50 ft. random direction."},{t:"r",n:"Target Lock Override",u:"(1 use)",d:"Redirect a missile/torpedo targeting a friendly ship within 300 ft. to yourself instead."}],pilot:"DEX and INT primary. Mahna Tir: advantage on all Piloting checks. Force-sensitive: spend a Force Point to use Targeting Computer without line-of-sight."}
+];
+let chars=JSON.parse(JSON.stringify(CHARS));
+let activePg="char_pc1";
+const PROF=3;
+function upd(id,fn){
+  if(!window.isAuthed||!window.isAuthed()){
+    alert("Please sign in first using the Sign in button in the top right.");
+    return;
+  }
+  const c=chars.find(x=>x.id===id);
+  fn(c);
+  render();
+  if(window.fbPushChar) window.fbPushChar(c);
+}
+function gc(id){return chars.find(x=>x.id===id)}
+const ABKEYS=["STR","DEX","CON","INT","WIS","CHA"];
+function ms(v){return v>=0?"+"+v:String(v)}
+function mod(s){return Math.floor((s-10)/2)}
+function watkBonus(c,w){
+  const abMap={};
+  Object.entries(c.abs).forEach(([k,[s]])=>{abMap[k]=mod(s);});
+  const base=abMap[w.ab]||0;
+  return ms(base+(w.prof?3:0));
+}
+function addWpn(id){
+  if(!window.requireAuth())return;
+  const n=prompt("Weapon name:");if(!n)return;
+  const ab=prompt("Ability (STR/DEX/CON/INT/WIS/CHA):","STR")||"STR";
+  const prof=confirm("Proficient?");
+  const dmg=prompt("Damage dice (e.g. 1d8):","1d8")||"1d8";
+  const dtype=prompt("Damage type (Energy/Kinetic/Ion):","Energy")||"Energy";
+  const range=prompt("Range (e.g. Melee or 60/240 ft.):","Melee")||"Melee";
+  const notes=prompt("Notes:","")||"";
+  upd(id,c=>{if(!c.wpns)c.wpns=[];c.wpns.push({n,ab:ab.toUpperCase(),prof:prof?1:0,dmg,dtype,range,notes});});
+}
+function delWpn(id,idx){
+  if(!window.requireAuth())return;
+  if(!confirm("Remove this weapon?"))return;
+  upd(id,c=>{c.wpns.splice(idx,1);});
+}
+function editAb(id,ab){
+  const c=gc(id);const v=prompt("Set "+ab+" score (1-30):",c.abs[ab][0]);if(v===null)return;
+  const n=Math.max(1,Math.min(30,parseInt(v)||c.abs[ab][0]));
+  upd(id,c=>{c.abs[ab]=[n,mod(n)];});
+}
+function toggleProf(id,type,idx){
+  upd(id,c=>{
+    const arr=type==="save"?c.saves:c.skills;const item=arr[idx];
+    if(!item.p&&!item.e){item.p=1;}else if(item.p&&!item.e){item.e=1;delete item.p;}else{delete item.p;delete item.e;}
+  });
+}
+function editAC(id){const c=gc(id);const v=prompt("Set AC:",c.ac);if(v!==null)upd(id,c=>{c.ac=parseInt(v)||c.ac});}
+function editInit(id){const c=gc(id);const v=prompt("Set Initiative (e.g. +3):",c.init);if(v!==null)upd(id,c=>{c.init=v||c.init});}
+function editSpd(id){const c=gc(id);const v=prompt("Set Speed:",c.spd);if(v!==null)upd(id,c=>{c.spd=v||c.spd});}
+function editMaxHP(id){const c=gc(id);const v=prompt("Set Max HP:",c.hpMax);if(v!==null)upd(id,c=>{c.hpMax=parseInt(v)||c.hpMax;c.hp=Math.min(c.hp,c.hpMax);});}
+function editMaxFP(id){const c=gc(id);const v=prompt("Set Max Force Points:",c.fpMax);if(v!==null)upd(id,c=>{c.fpMax=parseInt(v)||c.fpMax;c.fp=Math.min(c.fp,c.fpMax);});}
+function editName(id){const c=gc(id);const v=prompt("Character name:",c.name);if(v&&v.trim())upd(id,c=>{c.name=v.trim();});}
+function editSpecies(id){const c=gc(id);const v=prompt("Species:",c.species);if(v&&v.trim())upd(id,c=>{c.species=v.trim();});}
+function editCls(id){const c=gc(id);const v=prompt("Class / Level:",c.cls);if(v&&v.trim())upd(id,c=>{c.cls=v.trim();});}
+function renderChar(c){
+  const hcol=c.hp<1?"#d45b5b":c.hp<c.hpMax*.3?"#d4873a":"#3dba7e";
+  const portHtml=c.portrait?'<img src="'+c.portrait+'" style="width:100%;height:100%;object-fit:cover;object-position:top">':c.em;
+  const fpPips=Array.from({length:c.fpMax},(_,i)=>`<div class="fppip${i<c.fp?" on":""}" onclick="tFP('${c.id}',${i})"></div>`).join("");
+  const abItems=Object.entries(c.abs).map(([k,[s,m]])=>`<div class="abb" onclick="editAb('${c.id}','${k}')" style="cursor:pointer" title="Click to edit"><div class="abn">${k}</div><div class="absc">${s}</div><div class="abm">${ms(m)}</div></div>`).join("");
+  const saves=c.saves.map((s,i)=>`<div class="skr" onclick="toggleProf('${c.id}','save',${i})" style="cursor:pointer" title="Click to toggle proficiency"><div class="skp${s.p?" pr":""}"></div><span>${s.n}</span><span class="skv">${s.m}</span></div>`).join("");
+  const skills=c.skills.map((s,i)=>`<div class="skr" onclick="toggleProf('${c.id}','skill',${i})" style="cursor:pointer" title="Click to toggle proficiency"><div class="skp${s.e?" ex":s.p?" pr":""}"></div><span>${s.n}</span><span class="skv">${s.m}</span></div>`).join("");
+  const powers=c.powers.map((p,i)=>`<div class="pwr" style="border-bottom:${i<c.powers.length-1?"1px solid var(--bdr)":"none"}"><div><div class="pwn">${p.n}</div><div class="pwd">${p.d}</div></div><div class="pwc">${p.c}</div><div class="pwt">${p.t}</div></div>`).join("");
+  const wpns=(c.wpns||[]).map((w,i)=>{
+    const atk=watkBonus(c,w);
+    const abMap2={};Object.entries(c.abs).forEach(([k,[s]])=>{abMap2[k]=mod(s);});
+    const dmgMod=abMap2[w.ab]||0;
+    const dmgDisplay=w.dmg+(dmgMod>=0?"+"+dmgMod:String(dmgMod));
+    return `<tr>
+      <td style="font-weight:500;color:var(--txtb)">${w.n}</td>
+      <td><span class="wdmg" style="color:var(--green);border-color:rgba(61,186,126,.3);background:rgba(61,186,126,.08)" title="Click to roll attack" onclick="rollWpnAtk('${c.id}',${i})">${atk}</span></td>
+      <td><span class="wdmg" title="Click to roll damage" onclick="rollWpnDmg('${c.id}',${i})">${dmgDisplay}</span></td>
+      <td class="wtyp">${w.dtype}</td>
+      <td style="color:var(--txt3);font-size:11px">${w.range}</td>
+      <td style="color:var(--txt2);font-size:11px">${w.notes}</td>
+      <td><button class="dbtn" onclick="delWpn('${c.id}',${i})">×</button></td>
+    </tr>`;
+  }).join("");
+  const rc={standard:"rs",uncommon:"ru",rare:"rr",legendary:"rl"};
+  const inv=c.inv.map((item,idx)=>`<tr><td>${item.n}</td><td>${item.q}</td><td>${item.w}</td><td><span class="rar ${rc[item.r]||"rs"}">${item.r}</span></td><td style="color:var(--txt2);font-size:11px">${item.d}</td><td><button class="dbtn" onclick="delItem('${c.id}',${idx})">×</button></td></tr>`).join("");
+  const ds={success:"ss",pending:"sp",fail:"sf"};
+  const dt=c.dt.map((d,i)=>`<div class="dtc"><div><div class="dta" onclick="eDT('${c.id}',${i},'a')">${d.a}</div><div class="dtr" onclick="eDT('${c.id}',${i},'r')">${d.r}</div></div><button class="dtst ${ds[d.s]}" onclick="cDT('${c.id}',${i})">${d.s.toUpperCase()}</button><button class="dbtn" onclick="dDT('${c.id}',${i})">×</button></div>`).join("");
+  const rels=c.rels.map((r,ri)=>{
+    const pips=Array.from({length:5},(_,i)=>`<div class="bondp${i<r.b?" on":""}" onclick="setBond('${c.id}',${ri},${i+1})"></div>`).join("");
+    return `<div class="relr"><div class="relic">${r.ic}</div><div><div class="reln">${r.n}</div><div class="relro">${r.ro}</div><div class="relnote" onclick="eRelNote('${c.id}',${ri})">${r.note}</div><div class="bondm">${pips}</div></div></div>`;
+  }).join("");
+  return `<div class="cl"><aside class="sb"><div class="port">${portHtml}<div class="plbl">${c.lbl}</div></div><div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:var(--txtb);line-height:1.1;cursor:pointer" onclick="editName('${c.id}')" title="Click to edit">${c.name}</div><div style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;cursor:pointer" onclick="editSpecies('${c.id}')" title="Click to edit">${c.species}</div><div style="font-size:13px;color:${c.col};margin-top:5px;font-weight:500;cursor:pointer" onclick="editCls('${c.id}')" title="Click to edit">${c.cls}</div></div><div class="sblk"><div class="blbl">Hit Points</div><div class="hprow"><button class="hpbtn" onclick="aHP('${c.id}',-1)">−</button><div style="display:flex;align-items:baseline;gap:4px;flex:1;justify-content:center"><span class="hpnum" style="color:${hcol}" onclick="sHP('${c.id}')" title="Click to set">${c.hp}</span><span class="hpsep">/</span><span class="hpmax" onclick="editMaxHP('${c.id}')" style="cursor:pointer" title="Click to edit max">${c.hpMax}</span></div><button class="hpbtn" onclick="aHP('${c.id}',1)">+</button></div><div class="tmphp" onclick="sTemp('${c.id}')">${c.hpTemp?"+"+c.hpTemp+" temp HP":"+ Add temp HP"}</div></div><div class="sblk"><div class="blbl">Force Points</div><div style="font-family:var(--fd);font-size:20px;font-weight:700;color:#9b7fe8;line-height:1;margin-bottom:4px">${c.fp} / <span onclick="editMaxFP('${c.id}')" style="cursor:pointer;border-bottom:1px dashed #9b7fe8" title="Click to edit max">${c.fpMax}</span></div><div class="fprow">${fpPips}</div></div><div class="sblk"><div class="blbl">Combat</div><div class="mg"><div class="ms" onclick="editAC('${c.id}')" style="cursor:pointer"><div class="mv">${c.ac}</div><div class="ml">AC</div></div><div class="ms" onclick="editInit('${c.id}')" style="cursor:pointer"><div class="mv">${c.init}</div><div class="ml">Init</div></div><div class="ms" onclick="editSpd('${c.id}')" style="cursor:pointer;grid-column:1/-1"><div class="mv">${c.spd}</div><div class="ml">Speed</div></div></div></div></aside><div class="cm"><div class="sec"><div class="sch"><span class="sct">Ability Scores</span></div><div class="scb"><div class="abg">${abItems}</div></div></div><div class="sec"><div class="sch"><span class="sct">Saves &amp; Skills</span></div><div class="scb"><div class="ssg"><div><div class="blbl" style="margin-bottom:5px">Saving Throws</div>${saves}</div><div><div class="blbl" style="margin-bottom:5px">Skills</div>${skills}</div></div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:4px"></span>Proficient &nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px"></span>Expertise</div></div></div>${c.powers.length?'<div class="sec"><div class="sch"><span class="sct">Force Powers</span></div><div class="scb">'+powers+'</div></div>':"" }<div class="sec"><div class="sch"><span class="sct">Weapons</span><button class="abtn" onclick="addWpn('${c.id}')">+ Add weapon</button></div><div class="scb"><table class="wpn"><thead><tr><th>Name</th><th title="Click to roll attack">Attack ↗</th><th title="Click to roll damage">Damage ↗</th><th>Type</th><th>Range</th><th>Notes</th><th></th></tr></thead><tbody>${wpns||"<tr><td colspan='7' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No weapons.</td></tr>"}</tbody></table></div></div><div class="sec"><div class="sch"><span class="sct">Inventory</span><button class="abtn" onclick="addItem('${c.id}')">+ Add item</button></div><div class="scb"><table class="inv"><thead><tr><th>Item</th><th>Qty</th><th>Wt</th><th>Rarity</th><th>Notes</th><th></th></tr></thead><tbody>${inv||"<tr><td colspan='6' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No items.</td></tr>"}</tbody></table><div class="crrow"><span class="crv" onclick="sCr('${c.id}')" title="Click to edit">${c.credits.toLocaleString()}</span><span class="crl">credits</span></div></div></div><div class="sec"><div class="sch"><span class="sct">Downtime</span><button class="abtn" onclick="addDT('${c.id}')">+ Add entry</button></div><div class="scb">${dt||'<div style="font-size:12px;color:var(--txt3)">No entries yet.</div>'}</div></div><div class="sec"><div class="sch"><span class="sct">Relationships &amp; Bonds</span></div><div class="scb"><div>${rels}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)">Click pips to adjust bond · 3+ = Bond Boon available</div></div></div><div class="sec"><div class="sch"><span class="sct">Notes</span></div><div class="scb"><textarea class="notea" placeholder="Session notes, quest reminders..." oninput="sNotes('${c.id}',this.value)">${c.notes}</textarea><div class="noteh">Saves during this session · private to this browser tab</div></div></div></div></div>`;
+}
+function rollWpnDmg(id,idx){
+  const c=gc(id);const w=c.wpns[idx];
+  const [num,die]=w.dmg.split("d").map(Number);
+  const abMap={};
+  Object.entries(c.abs).forEach(([k,[s]])=>{abMap[k]=mod(s);});
+  const dmgMod=abMap[w.ab]||0;
+  let total=0;const rolls=[];
+  for(let i=0;i<num;i++){const r=Math.ceil(Math.random()*die);rolls.push(r);total+=r;}
+  const dmgTotal=total+dmgMod;
+  const atk=watkBonus(c,w);
+  const modStr=dmgMod>=0?"+"+dmgMod:String(dmgMod);
+  // Select correct die in panel and open it
+  const panel=document.getElementById("dice-panel");
+  if(panel)panel.classList.add("open");
+  // Update die selector to show correct die
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  const dieEl=document.getElementById("die"+die);
+  if(dieEl)dieEl.classList.add("active");
+  else document.getElementById("diecustom").classList.add("active");
+  document.getElementById("dicecount").textContent=num;
+  diceState.die=die;diceState.count=num;
+  // Show result
+  const res=document.getElementById("dpresult");
+  const tot=document.getElementById("dptotal");
+  const brk=document.getElementById("dpbreak");
+  const lbl=document.getElementById("dplabel");
+  if(res&&tot&&brk&&lbl){
+    res.classList.add("show");
+    tot.textContent=dmgTotal;
+    tot.className="dp-total";
+    brk.textContent=rolls.join(" + ")+(dmgMod!==0?" "+modStr:"")+(num>1||dmgMod!==0?" = "+dmgTotal:"");
+    lbl.textContent=w.n+" · "+w.dmg+modStr+" "+w.dtype+" · Atk: "+atk;
+    rollHistory.unshift({label:w.n+" dmg",total:dmgTotal,isCrit:false,isFail:false,breakdown:rolls.join("+")+(dmgMod!==0?modStr:"")});
+    if(rollHistory.length>10)rollHistory.pop();
+    renderHistory();
+  }
+}
+function rollWpnAtk(id,idx){
+  const c=gc(id);const w=c.wpns[idx];
+  const abMap={};
+  Object.entries(c.abs).forEach(([k,[s]])=>{abMap[k]=mod(s);});
+  const atkMod=(abMap[w.ab]||0)+(w.prof?PROF:0);
+  const adv=diceState.adv;
+  let r1=Math.ceil(Math.random()*20);
+  let r2=Math.ceil(Math.random()*20);
+  let chosen,breakdown;
+  if(adv==="adv"){chosen=Math.max(r1,r2);breakdown="Adv: ["+r1+", "+r2+"] → "+chosen;}
+  else if(adv==="dis"){chosen=Math.min(r1,r2);breakdown="Dis: ["+r1+", "+r2+"] → "+chosen;}
+  else{chosen=r1;breakdown="d20: "+r1;}
+  const total=chosen+atkMod;
+  const isCrit=chosen===20;
+  const isFail=chosen===1;
+  const modStr=atkMod>=0?"+"+atkMod:String(atkMod);
+  // Open panel, select d20
+  const panel=document.getElementById("dice-panel");
+  if(panel)panel.classList.add("open");
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  const d20el=document.getElementById("die20");
+  if(d20el)d20el.classList.add("active");
+  diceState.die=20;diceState.count=1;
+  document.getElementById("dicecount").textContent=1;
+  document.getElementById("advrow").style.display="flex";
+  const res=document.getElementById("dpresult");
+  const tot=document.getElementById("dptotal");
+  const brk=document.getElementById("dpbreak");
+  const lbl=document.getElementById("dplabel");
+  if(res&&tot&&brk&&lbl){
+    res.classList.add("show");
+    tot.textContent=total;
+    tot.className="dp-total"+(isCrit?" crit":isFail?" fail":"");
+    brk.textContent=breakdown+" "+modStr+" = "+total;
+    lbl.textContent=w.n+" attack"+(isCrit?" — CRITICAL HIT!":isFail?" — CRITICAL FAIL":"");
+    rollHistory.unshift({label:w.n+" atk",total,isCrit,isFail,breakdown:breakdown+modStr});
+    if(rollHistory.length>10)rollHistory.pop();
+    renderHistory();
+  }
+}
+function editFaction(key){
+  const cur=FACTION[key].v;
+  const v=prompt("Set "+key+" (0–100):",cur);
+  if(v===null)return;
+  const n=Math.max(0,Math.min(100,parseInt(v)||0));
+  FACTION[key].v=n;
+  render();
+  if(window.fbPushFaction) window.fbPushFaction();
+}
+function renderOps(){
+  const fsc=Object.entries(FACTION).map(([k,f])=>`<div class="fsc"><div class="fsh"><span class="fsk">${k}</span><span class="fsv" style="color:${f.col};cursor:pointer;border-bottom:1px dashed ${f.col}" onclick="editFaction('${k}')" title="Click to edit">${f.v}</span></div><div class="fsb"><div style="height:100%;border-radius:2px;background:${f.col};width:${Math.min(f.v,100)}%"></div></div><div class="fsd">${f.d}</div></div>`).join("");
+  const ds={success:"ss",pending:"sp",fail:"sf"};
+  const charDt=chars.map(c=>{
+    const cards=c.dt.map(d=>`<div class="dtgc"><div style="font-size:13px;font-weight:500;color:var(--txtb);margin-bottom:2px">${d.a}</div><div style="font-size:11px;color:var(--txt2);line-height:1.4;margin-bottom:5px">${d.r}</div><span class="dtst ${ds[d.s]}" style="cursor:default">${d.s.toUpperCase()}</span></div>`).join("");
+    return `<div style="margin-bottom:.9rem"><div class="ocl" style="color:${c.col}">${c.name}</div><div class="dtg">${cards}</div></div>`;
+  }).join("");
+  const evs=EVENTS.map((e,i)=>`<div class="evr" style="border-bottom:${i<EVENTS.length-1?"1px solid var(--bdr)":"none"}"><div class="evs">Sess. ${e.s}</div><div><div class="evt">${e.t}</div><div class="evd">${e.d}</div></div><span class="eve ${e.pos?"ep":"en"}">${e.e}</span></div>`).join("");
+  return `<div class="opspg"><div><div class="pgt">Operations</div><div class="pgs">REBEL CELL — DOWNTIME LOG &amp; FACTION STATUS</div></div><div class="sec"><div class="sch"><span class="sct">Cell Faction Stats</span></div><div class="scb"><div class="fsg">${fsc}</div><div style="margin-top:7px;font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div><div class="sec"><div class="sch"><span class="sct">Downtime Log — Current Arc</span></div><div class="scb">${charDt}</div></div><div class="sec"><div class="sch"><span class="sct">Galactic Event Log</span></div><div class="scb"><div>${evs}</div></div></div></div>`;
+}
+function renderShips(){
+  const bmap={r:"sfbr",vi:"sfbvi",vo:"sfbv"};
+  const cards=SHIPS.map((s,i)=>{
+    const uid="sh"+i;
+    const abstr=s.abs.map((v,j)=>`<div class="sab"><div class="sabn">${ABKEYS[j]}</div><div class="sabs">${v}</div><div class="sabm">${ms(Math.floor((v-10)/2))}</div></div>`).join("");
+    const acts=s.actions.filter(a=>a.t==="a");
+    const reacts=s.actions.filter(a=>a.t==="r");
+    return `<div class="shpc"><div class="shch"><span class="sfb ${bmap[s.badge]||"sfbr"}">${s.faction}</span><div class="shn">${s.name}</div><div class="shcl">${s.cls}</div></div><div class="shtabs"><button class="shtab active" onclick="shTab('${uid}','st',this)">Stats</button><button class="shtab" onclick="shTab('${uid}','wp',this)">Weapons</button><button class="shtab" onclick="shTab('${uid}','pi',this)">Pilot</button></div><div id="${uid}_st" class="shpn active"><div class="shsr">${[["AC",s.ac],["HP",s.hp],["Shields",s.sp],["Regen",s.regen],["Speed",s.spd]].map(([l,v])=>`<div class="shst"><div class="sssv">${v}</div><div class="sssl">${l}</div></div>`).join("")}</div><div class="shbl"><span>Hull</span><span>${s.hp} HP</span></div><div class="shb"><div style="height:100%;border-radius:2px;background:#3dba7e;width:${Math.round(s.hp/80*100)}%"></div></div><div class="shbl"><span>Shields</span><span>${s.sp} SP</span></div><div class="shb"><div style="height:100%;border-radius:2px;background:#5b9bd5;width:${Math.round(s.sp/50*100)}%"></div></div><div class="shab">${abstr}</div><div class="shsl">Ship Traits</div>${s.traits.map(t=>`<div class="shtr"><strong style="color:var(--txtb)">${t.n}.</strong> ${t.d}</div>`).join("")}</div><div id="${uid}_wp" class="shpn"><div class="shsl">Actions</div>${acts.map((a,j)=>`<div class="shac" style="border-bottom:${j<acts.length-1?"1px solid var(--bdr)":"none"}"><div class="shah"><span class="shan">${a.n}</span><span class="shau">${a.u}</span><span class="shat">Action</span></div><div class="shad">${a.d}</div></div>`).join("")}<div class="shsl" style="margin-top:.75rem">Reactions</div>${reacts.map((a,j)=>`<div class="shac" style="border-bottom:${j<reacts.length-1?"1px solid var(--bdr)":"none"}"><div class="shah"><span class="shan">${a.n}</span><span class="shau">${a.u}</span><span class="shat">Reaction</span></div><div class="shad">${a.d}</div></div>`).join("")}</div><div id="${uid}_pi" class="shpn"><div class="pilotnote"><strong>Pilot Guidance</strong>${s.pilot}</div></div></div>`;
+  }).join("");
+  return `<div class="shpg"><div style="padding:.9rem 0 .75rem"><div class="pgt">Cell Ships</div><div class="pgs">REBEL ALLIANCE — REGISTERED VESSELS</div></div><div class="shgg">${cards}</div></div>`;
+}
+function shTab(uid,pane,btn){["st","wp","pi"].forEach(p=>{const el=document.getElementById(uid+"_"+p);if(el)el.classList.toggle("active",p===pane)});btn.closest(".shtabs").querySelectorAll(".shtab").forEach(b=>b.classList.remove("active"));btn.classList.add("active")}
+function buildNav(){let h="";chars.forEach(c=>{h+=`<button class="nb${activePg==="char_"+c.id?" active":""}" onclick="showPg('char_${c.id}',this)">${c.name.split(" ")[0]}</button>`});h+=`<div class="ndiv"></div>`;h+=`<button class="nb${activePg==="ops"?" active":""}" onclick="showPg('ops',this)">Operations</button>`;h+=`<button class="nb${activePg==="ships"?" active":""}" onclick="showPg('ships',this)">Ships</button>`;h+=`<button class="nb${activePg==="codex"?" active":""}" onclick="showPg('codex',this)">Codex</button>`;document.getElementById("nav").innerHTML=h}
+function render(){buildNav();let h="";chars.forEach(c=>{h+=`<div class="pg${activePg==="char_"+c.id?" active":""}" id="pg_char_${c.id}">${renderChar(c)}</div>`});h+=`<div class="pg${activePg==="ops"?" active":""}" id="pg_ops">${renderOps()}</div>`;h+=`<div class="pg${activePg==="ships"?" active":""}" id="pg_ships">${renderShips()}</div>`;h+=`<div class="pg${activePg==="codex"?" active":""}" id="pg_codex">${renderCodex()}</div>`;document.getElementById("pages").innerHTML=h}
+function showPg(id,btn){activePg=id;document.querySelectorAll(".nb").forEach(b=>b.classList.remove("active"));document.querySelectorAll(".pg").forEach(p=>p.classList.remove("active"));const pg=document.getElementById("pg_"+id);if(pg)pg.classList.add("active");btn.classList.add("active")}
+function aHP(id,d){upd(id,c=>{c.hp=Math.max(0,Math.min(c.hpMax,c.hp+d))})}
+function sHP(id){const c=gc(id);const v=prompt("Set HP (max "+c.hpMax+"):",c.hp);if(v!==null)upd(id,c=>{c.hp=Math.max(0,Math.min(c.hpMax,parseInt(v)||0))})}
+function sTemp(id){const c=gc(id);const v=prompt("Temp HP:",c.hpTemp||0);if(v!==null)upd(id,c=>{c.hpTemp=Math.max(0,parseInt(v)||0)})}
+function tFP(id,i){upd(id,c=>{c.fp=i<c.fp?i:i+1;c.fp=Math.max(0,Math.min(c.fpMax,c.fp))})}
+function sCr(id){const c=gc(id);const v=prompt("Credits:",c.credits);if(v!==null)upd(id,c=>{c.credits=Math.max(0,parseInt(v.replace(/,/g,""))||0)})}
+function addItem(id){const n=prompt("Item name:");if(!n)return;const q=parseInt(prompt("Qty:","1"))||1;const w=prompt("Weight:","—")||"—";const r=prompt("Rarity (standard/uncommon/rare/legendary):","standard")||"standard";const d=prompt("Notes:","")||"";upd(id,c=>{c.inv.push({n,q,w,r,d})})}
+function delItem(id,idx){if(!confirm("Remove this item?"))return;upd(id,c=>{c.inv.splice(idx,1)})}
+function addDT(id){const a=prompt("Downtime activity:");if(!a)return;const r=prompt("Result / notes:","Pending...")||"Pending...";upd(id,c=>{c.dt.push({a,r,s:"pending"})})}
+function dDT(id,i){if(!confirm("Remove entry?"))return;upd(id,c=>{c.dt.splice(i,1)})}
+function eDT(id,i,field){const c=gc(id);const v=prompt("Edit:",field==="a"?c.dt[i].a:c.dt[i].r);if(v!==null)upd(id,c=>{if(field==="a")c.dt[i].a=v;else c.dt[i].r=v})}
+function cDT(id,i){const ord=["pending","success","fail"];upd(id,c=>{c.dt[i].s=ord[(ord.indexOf(c.dt[i].s)+1)%3]})}
+function setBond(id,ri,val){upd(id,c=>{c.rels[ri].b=c.rels[ri].b===val?val-1:val})}
+function eRelNote(id,ri){const c=gc(id);const v=prompt("Edit note:",c.rels[ri].note);if(v!==null)upd(id,c=>{c.rels[ri].note=v})}
+function sNotes(id,val){
+  const c=gc(id);
+  c.notes=val;
+  if(window.fbPushChar) window.fbPushChar(c);
+}
+
+// ── Dice Roller ───────────────────────────────────────────────────────────
+let diceState={die:20,count:1,adv:"nor"};
+let rollHistory=[];
+
+function toggleDice(){
+  const p=document.getElementById("dice-panel");
+  p.classList.toggle("open");
+}
+
+function selDie(n){
+  diceState.die=n;
+  diceState.count=1;
+  document.getElementById("dicecount").textContent=1;
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  const el=document.getElementById("die"+n);
+  if(el)el.classList.add("active");
+  // Only show adv/dis row for d20
+  document.getElementById("advrow").style.display=n===20?"flex":"none";
+}
+
+function adjCount(d){
+  diceState.count=Math.max(1,Math.min(20,diceState.count+d));
+  document.getElementById("dicecount").textContent=diceState.count;
+}
+
+function setAdv(mode){
+  diceState.adv=mode;
+  document.getElementById("advbtn").className="dp-advbtn"+(mode==="adv"?" adv-on":"");
+  document.getElementById("disbtn").className="dp-advbtn"+(mode==="dis"?" dis-on":"");
+  document.getElementById("norbtn").className="dp-advbtn";
+}
+
+function rollOne(sides){return Math.floor(Math.random()*sides)+1;}
+
+function doRoll(overrideDie,overrideCount,label){
+  const die=overrideDie||diceState.die;
+  const count=overrideCount||diceState.count;
+  const adv=diceState.adv;
+  let rolls=[];
+  let total=0;
+  let breakdown="";
+  let resultLabel=label||(count+"d"+die);
+  let isCrit=false;
+  let isFail=false;
+
+  if(die===20&&count===1&&adv!=="nor"){
+    const r1=rollOne(20);const r2=rollOne(20);
+    const chosen=adv==="adv"?Math.max(r1,r2):Math.min(r1,r2);
+    total=chosen;
+    breakdown=(adv==="adv"?"Adv":"Dis")+": ["+r1+", "+r2+"] → "+chosen;
+    isCrit=chosen===20;
+    isFail=chosen===1;
+    resultLabel+=(adv==="adv"?" (Advantage)":" (Disadvantage)");
+  } else {
+    for(let i=0;i<count;i++){const r=rollOne(die);rolls.push(r);total+=r;}
+    breakdown=rolls.join(" + ")+(count>1?" = "+total:"");
+    if(die===20&&count===1){isCrit=total===20;isFail=total===1;}
+  }
+
+  // Update result display
+  const res=document.getElementById("dpresult");
+  const tot=document.getElementById("dptotal");
+  const brk=document.getElementById("dpbreak");
+  const lbl=document.getElementById("dplabel");
+  res.classList.add("show");
+  tot.textContent=total;
+  tot.className="dp-total"+(isCrit?" crit":isFail?" fail":"");
+  brk.textContent=breakdown;
+  lbl.textContent=resultLabel+(isCrit?" — CRITICAL HIT!":isFail?" — CRITICAL FAIL":"");
+
+  // Add to history
+  rollHistory.unshift({label:resultLabel,total,isCrit,isFail,breakdown});
+  if(rollHistory.length>10)rollHistory.pop();
+  renderHistory();
+}
+
+function renderHistory(){
+  const h=document.getElementById("dphist");
+  if(!rollHistory.length){h.innerHTML="";return;}
+  h.innerHTML=rollHistory.map(r=>`<div class="dp-hrow"><span class="dp-hlbl">${r.label}</span><span class="dp-hval${r.isCrit?" hcrit":r.isFail?" hfail":""}">${r.total}${r.isCrit?" ★":r.isFail?" ✕":""}</span></div>`).join("");
+}
+
+function rollCustom(){
+  const input=prompt("Enter dice notation (e.g. 2d6, 1d8+3, 3d4):");
+  if(!input)return;
+  const match=input.trim().match(/^(\d+)d(\d+)([+-]\d+)?$/i);
+  if(!match){alert("Format: NdN or NdN+bonus (e.g. 2d6 or 1d8+3)");return;}
+  const count=parseInt(match[1]);
+  const die=parseInt(match[2]);
+  const bonus=parseInt(match[3]||0);
+  if(count<1||count>20||die<2){alert("Keep it between 1-20 dice and d2 minimum.");return;}
+  let rolls=[];let total=0;
+  for(let i=0;i<count;i++){const r=rollOne(die);rolls.push(r);total+=r;}
+  total+=bonus;
+  const breakdown=rolls.join(" + ")+(bonus!==0?(bonus>0?"+":"")+bonus:"")+(count>1||bonus!==0?" = "+total:"");
+  // Show result
+  const res=document.getElementById("dpresult");
+  const tot=document.getElementById("dptotal");
+  const brk=document.getElementById("dpbreak");
+  const lbl=document.getElementById("dplabel");
+  res.classList.add("show");
+  tot.textContent=total;
+  tot.className="dp-total";
+  brk.textContent=breakdown;
+  lbl.textContent=input.trim();
+  rollHistory.unshift({label:input.trim(),total,isCrit:false,isFail:false,breakdown});
+  if(rollHistory.length>10)rollHistory.pop();
+  renderHistory();
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  document.getElementById("diecustom").classList.add("active");
+}
+
+// ── Codex ─────────────────────────────────────────────────────────────────
+let codexData={npcs:[],planets:[],orgs:[]};
+let codexTab="npcs";
+let codexSearch="";
+let codexLoaded=false;
+
+const CODEX_DEFAULTS={
+  npcs:[
+    {id:"npc1",name:"Knight Aelix",affiliation:"Vossar Jedi",status:"alive",location:"Secret Temple / Mobile",portrait:"",description:"Field commander and primary Jedi contact for the rebel cell. Capable and warm beneath the surface, carrying something personal regarding Senator Allendor.",history:"A Vossar Knight who reached out to recruit the party. Served as bridge between the Jedi and the Rebellion. Led the briefing at the Rancor's Roost cantina and introduced the party to Master Voska.",rels:"Close bond with the party. Unspoken personal connection to Senator Allendor. Mentor figure to Kierra.",hidden:false},
+    {id:"npc2",name:"Master Taryn Voska",affiliation:"Vossar Jedi — Founder",status:"alive",location:"Secret Temple",portrait:"",description:"Philosophical leader and founder of the Vossar Jedi. Older, thoughtful, warm but carrying the weight of a fractured galaxy. Believes the Force guided the party to him.",history:"Departed the Jedi Temple a decade before the Clone Wars, establishing the Vossar Order on three pillars: adaptability, empathy, and pragmatic defense. Survived Order 66 by virtue of his independence from the main Order.",rels:"Spiritual mentor to all Vossar Jedi. Sees the party as chosen by the Force.",hidden:false},
+    {id:"npc3",name:"Kierra",affiliation:"Vossar Jedi — Padawan",status:"alive",location:"Secret Temple",portrait:"",description:"Emerging leader among the Padawans. Confidence growing steadily. Often succeeds where the Knights struggle to connect. First met the party at the Rancor's Roost.",history:"Guided the party to the Temple after spotting them at the Rancor's Roost. Has served as steady mentor during training. Her abilities and confidence have grown markedly over the past year.",rels:"Strong bond with the party. Close to Aelix and Voska. Future major NPC.",hidden:false},
+    {id:"npc4",name:"Initiate Sylos Mir",affiliation:"Vossar Jedi — Clan Aetherion",status:"alive",location:"Secret Temple",portrait:"",description:"Young prodigy who speaks in cryptic visions. Said to have seen the fall and return of the Jedi. Eccentric and unsettling in equal measure.",history:"Member of Clan Aetherion, the Vossar mystic clan. His visions have begun aligning with what the party is uncovering at Ossus. Has seen the party in his visions but refuses to explain what happened.",rels:"Mysterious connection to the party's Force-sensitive members. Closely watched by Master Voska.",hidden:false},
+    {id:"npc5",name:"Queen Celine of House Adenor",affiliation:"Kingdom of Virellia",status:"alive",location:"Virellian Space",portrait:"",description:"Monarch of Virellia. Young, strikingly beautiful, calm command. Blends regal elegance with practical light armor. A tattoo beneath her sleeve — faint, deliberate, clearly significant.",history:"Patron and protector of the rebel cell before the party arrived. Sheltered freed slaves from Tebo Station, provided material support, and arranged the Pelion blockade run. Her support is genuine but constrained by Imperial oversight.",rels:"Patron of the cell. Trusts Aelix deeply. Drawn to Force-sensitive party members.",hidden:false},
+    {id:"npc6",name:"Senator Cassia Allendor",affiliation:"Virellian / Imperial Senate",status:"alive",location:"Imperial Senate / Mobile",portrait:"",description:"Countess of Meserian. Dark hair, sharp green eyes. Diplomatic robes with understated armor. Fights within the Imperial Senate for what remains of the Republic's ideals.",history:"Has lobbied alongside Senators Mothma and Organa for Pelion relief. Secured documentation of the Public Order Directive. Has provided political cover that saved the cell more than once.",rels:"Unspoken personal connection to Aelix. Sees the party as assets. Ally of Mothma and Organa.",hidden:false},
+    {id:"npc7",name:"Colonel Devand Chasid",affiliation:"Harloen Rangers — Rebel Cell",status:"alive",location:"Rebel Base",portrait:"",description:"Commander of the Harloen Rangers and the rebel cell. Steady, respected, protective of his people. Made the call to defect and carries that responsibility.",history:"Led the Rangers' defection from Harloen after the Empire moved to nationalize the planetary defense force. Promoted from Captain after the successful extraction at Veilwatch Base.",rels:"Trusts the party after Veilwatch. Commands the cell's ground forces alongside Captain Celt.",hidden:false},
+    {id:"npc8",name:"Naresh",affiliation:"Independent — Smuggler",status:"alive",location:"Outer Rim",portrait:"",description:"Smuggler and intelligence contact with connections across the Outer Rim. Informal but reliable. His information on the Crymorah Syndicate proved accurate and cost him something to obtain.",history:"Provided confirmed intelligence on the Crymorah Syndicate's presence on Ryndal IV. His tip enabled the liberation of the slaving depot. The party owes him a favor.",rels:"Informal contact. Reliable but expensive. Party owes him a favor.",hidden:false},
+    {id:"npc9",name:"Ped Baywhit",affiliation:"Kingdom of Virellia — KDA",status:"alive",location:"Virellian Space",portrait:"",description:"Royal Advisor to Queen Celine and leader of the KDA. Weathered face, neat beard. Muted court attire. Speaks little. When he does, people listen.",history:"The quiet power behind the Queen's political operations. Has been watching the party since their first meeting with the Queen. Asks nothing — for now.",rels:"Serves the Queen absolutely. Neutral toward the party but watchful.",hidden:true},
+    {id:"npc10",name:"Knight Oran Vex",affiliation:"Vossar Jedi — Clan Vorsa",status:"alive",location:"Imperial Supply Fleet (Embedded)",portrait:"",description:"Master of disguise and deep cover operative for Clan Vorsa. Currently embedded within an Imperial supply fleet under an assumed identity.",history:"One of the Vossar Order's most capable infiltrators. Has been undercover for months. The party has not yet met him in person.",rels:"Unknown to the party directly. Clan Vorsa contact.",hidden:true}
+  ],
+  planets:[
+    {id:"pl1",name:"Harloen",region:"Outer Rim — Kathari Expanse",control:"partial",description:"A mid-sized world with a largely agricultural economy and a proud tradition of local defense. Home of the Harloen Rangers before the Empire moved to nationalize them.",locations:"Veilwatch Base — former Ranger HQ, now abandoned after the defection. Northern Mountains — site of the destroyed Imperial listening post.",hidden:false},
+    {id:"pl2",name:"Meserian",region:"Outer Rim — Kathari Expanse",control:"partial",description:"Home world of Senator Cassia Allendor, Countess of Meserian. A cosmopolitan world that serves as a political hub for the Kathari Expanse. The rebel cell is currently based here.",locations:"Rebel Base — current cell HQ, established after the Harloen extraction. Allendor Estate — the Senator's family seat, discreetly available as a safe house.",hidden:false},
+    {id:"pl3",name:"Weik",region:"Wild Space",control:"none",description:"A beautiful world of blue oceans and sprawling green lands, locked in a late iron age. No starport, no Empire, no communications grid. Home of the Adamite Tower and the Paladins who guard it.",locations:"Adamite Tower — a castle built atop a half-buried ancient starship. Inner Temple — where the party underwent kyber crystal trials. The Buried Hull — unexplored lower decks beneath the Tower.",hidden:false},
+    {id:"pl4",name:"Joraad",region:"Chorlian Drift",control:"none",description:"A shattered moon orbiting a gas giant lost in the mists of the Chorlian Drift. Once a world of deep canyons and crystalline forests, now broken — its surface cracked open like a shattered holocron.",locations:"The Temple — a monolithic structure half-swallowed by rock, containing the first Ossus map fragment. Geothermal Scars — glowing tectonic wounds that illuminate the barren landscape.",hidden:false},
+    {id:"pl5",name:"Ryndal IV",region:"Outer Rim",control:"partial",description:"A jungle world that served as a Crymorah Syndicate slaving depot. Imperial contracts funded the operation. The cell destroyed the depot and freed the captives.",locations:"Destroyed Depot — the cleared Crymorah facility. Jungle Clearing — site of the battle, now abandoned.",hidden:false},
+    {id:"pl6",name:"Ossus",region:"Outer Rim — Adega System",control:"none",description:"Once one of the greatest repositories of Jedi knowledge in the galaxy. Devastated centuries ago during the Sith Wars. The Great Library may still hold secrets the Empire would kill to possess.",locations:"The Great Library — rumored to survive in some form beneath the ruins. The Adegan Asteroids — debris field surrounding the system, treacherous to navigate.",hidden:true},
+    {id:"pl7",name:"Pelion",region:"Outer Rim — Kathari Expanse",control:"occupied",description:"A world under Imperial blockade — officially for security enforcement, in reality retribution for local resistance. The cell ran aid shipments through the blockade under Virellian political cover.",locations:"Blockade Zone — the orbital cordon that the cell breached. Relief Settlements — civilian communities that received the aid.",hidden:false}
+  ],
+  orgs:[
+    {id:"org1",name:"Vossar Jedi Order",type:"jedi",disposition:"allied",description:"A breakaway Jedi sect founded by Master Taryn Voska, who rejected the rigid orthodoxy of the High Council. Survived the Purge by virtue of their independence and secrecy.",history:"Founded over a decade before the Clone Wars. Reconciled briefly with the main Order during the war but maintained independence. Survived Order 66 hidden and rebuilding. Now operate from a secret temple, covertly aiding the Rebellion and sheltering refugees. Organized into five clans: Vorsa (stealth), Shalev (healing/diplomacy), Kaelus (military), Aetherion (Force study), Dorel (exploration).",hidden:false},
+    {id:"org2",name:"Kingdom of Virellia",type:"neutral",disposition:"allied",description:"A sovereign constitutional monarchy spanning seven planetary systems in the Kathari Expanse. A beacon of stability now chafing under Imperial oversight.",history:"Led by Queen Celine of House Adenor. Suffered the Sundering during the Clone Wars when two systems defected to the Separatists. Now under Imperial oversight — an Observer Group holds non-voting Senate seats and Moffs are embedded in the bureaucracy. The Virellian Restoration Bloc within Parliament seeks to expel Imperial influence by any means necessary.",hidden:false},
+    {id:"org3",name:"Harloen Rangers",type:"rebel",disposition:"allied",description:"A volunteer planetary defense force widely beloved by the people of Harloen. Defected to the Rebellion when the Empire moved to nationalize and dissolve them. Now the backbone of the player cell.",history:"Over forty personnel — troopers, officers, pilots, support staff. Led by Colonel Devand Chasid with Captain Trazon Celt commanding ground forces and Captain Mahna Tir leading the air wing. Extracted from Veilwatch Base by the party in Chapter 1.",hidden:false},
+    {id:"org4",name:"Crymorah Syndicate",type:"criminal",disposition:"hostile",description:"A criminal organization operating in the Outer Rim, contracted by the Empire to supply slave labor for Imperial construction projects. The cell has struck them twice — at Tebo Station and Ryndal IV.",history:"Confirmed Imperial contracts for labor supply. The cell disrupted their operations at Tebo Station (Chapter 1) and destroyed their slaving depot on Ryndal IV (Chapter 2). Their presence in the sector has been weakened but not eliminated.",hidden:false},
+    {id:"org5",name:"Imperial Inquisitorius",type:"imperial",disposition:"hostile",description:"Dark side Force users trained by the Empire to hunt Jedi survivors. Fallen initiates, tortured minds. Their double-bladed crimson lightsabers are a hallmark of dread.",history:"An Inquisitor was confirmed during the Prison Barge X-103 operation. Their presence signals the Empire knows Force-sensitives are operating in the sector. The Inquisitorius answers directly to Darth Vader.",hidden:false},
+    {id:"org6",name:"Virellian Restoration Bloc",type:"rebel",disposition:"allied",description:"A growing faction within the Virellian Parliament seeking to expel Imperial influence — by legal, political, and if necessary covert means. Not unified: ranges from idealistic parliamentarians to underground operatives.",history:"The underground wing spreads dissent through encoded HoloNet broadcasts. Remnants of Jedi allies hide in mountain fortresses and ancient ruins. A counter-faction within Parliament argues for appeasement.",hidden:false},
+    {id:"org7",name:"The Alderaanian Resistance",type:"rebel",disposition:"allied",description:"Rebel agents operating under the codename Fulcrum, connected to Alderaan's covert resistance network. Assisted the cell during the Fresia X-wing heist.",history:"Fulcrum agents were embedded on Fresia for weeks before the X-wing heist, drawing Imperial attention away from the facility. Connected to Senator Bail Organa's intelligence network.",hidden:true}
+  ]
+};
+
+function openCodexModal(type,id){
+  const entry=codexData[type].find(e=>e.id===id);if(!entry)return;
+  const isDM=window.isDM&&window.isDM();
+  document.getElementById("cdxModalTitle").textContent=entry.name;
+  let html="";
+  if(entry.portrait) html+=`<img class="cdx-modal-img" src="${entry.portrait}" alt="${entry.name}">`;
+  html+=`<div class="cdx-modal-body">`;
+  if(type==="npcs"){
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Affiliation</div><div class="cdx-modal-val">${entry.affiliation}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Status</div><div class="cdx-modal-val">${cdxStatusBadge(entry.status)}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Last Known Location</div><div class="cdx-modal-val">${entry.location}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Description</div><div class="cdx-modal-val">${entry.description}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">History</div><div class="cdx-modal-val">${entry.history}</div></div>`;
+    if(entry.rels) html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Relationships</div><div class="cdx-modal-val">${entry.rels}</div></div>`;
+    if(entry.portrait&&isDM) html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Portrait URL</div><div class="cdx-modal-val" style="word-break:break-all;font-size:11px">${entry.portrait}</div></div>`;
+  }else if(type==="planets"){
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Region</div><div class="cdx-modal-val">${entry.region}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Imperial Presence</div><div class="cdx-modal-val">${cdxControlBadge(entry.control)}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Description</div><div class="cdx-modal-val">${entry.description}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Notable Locations</div><div class="cdx-modal-val">${entry.locations}</div></div>`;
+  }else{
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Type</div><div class="cdx-modal-val">${cdxTypeBadge(entry.type)}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Disposition</div><div class="cdx-modal-val">${cdxDispBadge(entry.disposition)}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Description</div><div class="cdx-modal-val">${entry.description}</div></div>`;
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">History</div><div class="cdx-modal-val">${entry.history}</div></div>`;
+  }
+  if(isDM){
+    html+=`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--bdr);display:flex;gap:6px">
+      <button class="abtn" onclick="closeCodexModal();editCodexEntry('${type}','${id}')">Edit</button>
+      <button class="abtn" onclick="closeCodexModal();toggleHidden('${type}','${id}')">${entry.hidden?"Reveal":"Hide"}</button>
+      <button class="abtn" style="color:var(--red)" onclick="closeCodexModal();deleteCodexEntry('${type}','${id}')">Delete</button>
+    </div>`;
+  }
+  html+=`</div>`;
+  document.getElementById("cdxModalContent").innerHTML=html;
+  document.getElementById("cdxModal").classList.add("open");
+  document.body.style.overflow="hidden";
+}
+function closeCodexModal(){
+  document.getElementById("cdxModal").classList.remove("open");
+  document.body.style.overflow="";
+}
+window.openCodexModal=openCodexModal;
+window.closeCodexModal=closeCodexModal;
+  if(codexLoaded)return;
+  try{
+    const {getDoc,doc}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  }catch(e){}
+  // Load from Firestore via window.fbGetCodex if available, else use defaults
+  if(window.fbGetCodex){
+    const data=await window.fbGetCodex();
+    if(data){codexData=data;codexLoaded=true;return;}
+  }
+  codexData=JSON.parse(JSON.stringify(CODEX_DEFAULTS));
+  codexLoaded=true;
+}
+
+async function saveCodex(){
+  if(window.fbSaveCodex) await window.fbSaveCodex(codexData);
+}
+
+function cdxStatusBadge(s){const m={alive:"st-alive",missing:"st-missing",dead:"st-dead",unknown:"st-unknown"};return`<span class="cdx-badge ${m[s]||"st-unknown"}">${s}</span>`;}
+function cdxTypeBadge(t){const m={jedi:"ot-jedi",rebel:"ot-rebel",imperial:"ot-imperial",criminal:"ot-criminal",neutral:"ot-neutral"};return`<span class="cdx-badge ${m[t]||"ot-neutral"}">${t}</span>`;}
+function cdxControlBadge(c){const m={none:"ic-none",partial:"ic-partial",occupied:"ic-occupied",lockdown:"ic-lockdown"};const l={none:"No Imperial Presence",partial:"Partial Control",occupied:"Occupied",lockdown:"Lockdown"};return`<span style="font-family:var(--fm);font-size:9px;font-weight:600" class="${m[c]||"ic-partial"}">${l[c]||c}</span>`;}
+function cdxDispBadge(d){const m={allied:"dp-allied",hostile:"dp-hostile",neutral:"dp-neutral",unknown:"dp-unknown"};return`<span style="font-family:var(--fm);font-size:10px;font-weight:600" class="${m[d]||"dp-neutral"}">${d}</span>`;}
+
+function addCodexEntry(type){
+  if(!window.requireDM())return;
+  const name=prompt("Name:");if(!name)return;
+  const entry={id:type+Date.now(),name,hidden:false};
+  if(type==="npcs"){
+    entry.affiliation=prompt("Affiliation:","")||"";
+    entry.status=prompt("Status (alive/missing/dead/unknown):","alive")||"alive";
+    entry.location=prompt("Last known location:","")||"Unknown";
+    entry.portrait="";
+    entry.description=prompt("Description:","")||"";
+    entry.history=prompt("History:","")||"";
+    entry.rels=prompt("Relationships:","")||"";
+  }else if(type==="planets"){
+    entry.region=prompt("Region:","")||"";
+    entry.control=prompt("Imperial control (none/partial/occupied/lockdown):","none")||"none";
+    entry.description=prompt("Description:","")||"";
+    entry.locations=prompt("Notable locations:","")||"";
+  }else{
+    entry.type=prompt("Type (jedi/rebel/imperial/criminal/neutral):","neutral")||"neutral";
+    entry.disposition=prompt("Disposition (allied/neutral/hostile/unknown):","neutral")||"neutral";
+    entry.description=prompt("Description:","")||"";
+    entry.history=prompt("History:","")||"";
+  }
+  codexData[type].push(entry);
+  saveCodex();
+  render();
+}
+
+function editCodexEntry(type,id){
+  if(!window.requireDM())return;
+  const entry=codexData[type].find(e=>e.id===id);if(!entry)return;
+  const field=prompt("Edit field:\nname / affiliation / status / location / portrait / description / history / rels (NPC)\nname / region / control / description / locations (Planet)\nname / type / disposition / description / history (Org)");
+  if(!field)return;
+  const val=prompt("New value:",entry[field]||"");
+  if(val===null)return;
+  entry[field]=val;
+  saveCodex();
+  render();
+}
+
+function toggleHidden(type,id){
+  if(!window.requireDM())return;
+  const entry=codexData[type].find(e=>e.id===id);if(!entry)return;
+  entry.hidden=!entry.hidden;
+  saveCodex();
+  render();
+}
+
+function deleteCodexEntry(type,id){
+  if(!window.requireDM())return;
+  if(!confirm("Delete this entry?"))return;
+  codexData[type]=codexData[type].filter(e=>e.id!==id);
+  saveCodex();
+  render();
+}
+
+function renderCodex(){
+  const isDM=window.isDM&&window.isDM();
+  const q=codexSearch.toLowerCase();
+  const section=codexData[codexTab]||[];
+  const filtered=section.filter(e=>{
+    if(!isDM&&e.hidden)return false;
+    if(!q)return true;
+    return JSON.stringify(e).toLowerCase().includes(q);
+  });
+
+  let cards="";
+  if(codexTab==="npcs"){
+    cards=filtered.map(e=>{
+      const body=e.hidden&&!isDM?
+        `<div class="cdx-redacted"><span class="cdx-redacted-txt">⬛ CLASSIFIED — DM EYES ONLY</span></div>`:
+        `<div class="cdx-card-body">
+          ${e.portrait?`<img src="${e.portrait}" style="width:100%;height:140px;object-fit:cover;object-position:top;border-radius:2px;margin-bottom:.65rem">` :""}
+          <div class="cdx-field"><div class="cdx-field-lbl">Affiliation</div><div class="cdx-field-val">${e.affiliation}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Last Known Location</div><div class="cdx-field-val">${e.location}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Description</div><div class="cdx-field-val">${e.description}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">History</div><div class="cdx-field-val">${e.history}</div></div>
+          ${e.rels?`<div class="cdx-field"><div class="cdx-field-lbl">Relationships</div><div class="cdx-field-val">${e.rels}</div></div>`:""}
+          ${isDM?`<div class="cdx-actions">
+            <button class="abtn" onclick="editCodexEntry('npcs','${e.id}')">Edit</button>
+            <button class="abtn" onclick="toggleHidden('npcs','${e.id}')">${e.hidden?"Reveal":"Hide"}</button>
+            <button class="abtn" style="color:var(--red)" onclick="deleteCodexEntry('npcs','${e.id}')">Delete</button>
+          </div>`:""}
+        </div>`;
+      return `<div class="cdx-card${e.hidden?" hidden-entry":""}" style="cursor:pointer" onclick="openCodexModal('npcs','${e.id}')">
+        <div class="cdx-card-hdr">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="cdx-card-title">${e.name}</span>
+            ${cdxStatusBadge(e.status)}
+            ${e.hidden?`<span class="cdx-badge st-unknown">Hidden</span>`:""}
+          </div>
+        </div>${body}</div>`;
+    }).join("");
+  }else if(codexTab==="planets"){
+    cards=filtered.map(e=>{
+      const body=e.hidden&&!isDM?
+        `<div class="cdx-redacted"><span class="cdx-redacted-txt">⬛ CLASSIFIED — DM EYES ONLY</span></div>`:
+        `<div class="cdx-card-body">
+          <div class="cdx-field"><div class="cdx-field-lbl">Region</div><div class="cdx-field-val">${e.region}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Imperial Presence</div><div class="cdx-field-val">${cdxControlBadge(e.control)}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Description</div><div class="cdx-field-val">${e.description}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Notable Locations</div><div class="cdx-field-val">${e.locations}</div></div>
+          ${isDM?`<div class="cdx-actions">
+            <button class="abtn" onclick="editCodexEntry('planets','${e.id}')">Edit</button>
+            <button class="abtn" onclick="toggleHidden('planets','${e.id}')">${e.hidden?"Reveal":"Hide"}</button>
+            <button class="abtn" style="color:var(--red)" onclick="deleteCodexEntry('planets','${e.id}')">Delete</button>
+          </div>`:""}
+        </div>`;
+      return `<div class="cdx-card${e.hidden?" hidden-entry":""}" style="cursor:pointer" onclick="openCodexModal('planets','${e.id}')">
+        <div class="cdx-card-hdr">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="cdx-card-title">${e.name}</span>
+            ${e.hidden?`<span class="cdx-badge st-unknown">Hidden</span>`:""}
+          </div>
+        </div>${body}</div>`;
+    }).join("");
+  }else{
+    cards=filtered.map(e=>{
+      const body=e.hidden&&!isDM?
+        `<div class="cdx-redacted"><span class="cdx-redacted-txt">⬛ CLASSIFIED — DM EYES ONLY</span></div>`:
+        `<div class="cdx-card-body">
+          <div class="cdx-field"><div class="cdx-field-lbl">Type / Disposition</div><div class="cdx-field-val">${cdxTypeBadge(e.type)} ${cdxDispBadge(e.disposition)}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Description</div><div class="cdx-field-val">${e.description}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">History</div><div class="cdx-field-val">${e.history}</div></div>
+          ${isDM?`<div class="cdx-actions">
+            <button class="abtn" onclick="editCodexEntry('orgs','${e.id}')">Edit</button>
+            <button class="abtn" onclick="toggleHidden('orgs','${e.id}')">${e.hidden?"Reveal":"Hide"}</button>
+            <button class="abtn" style="color:var(--red)" onclick="deleteCodexEntry('orgs','${e.id}')">Delete</button>
+          </div>`:""}
+        </div>`;
+      return `<div class="cdx-card${e.hidden?" hidden-entry":""}" style="cursor:pointer" onclick="openCodexModal('orgs','${e.id}')">
+        <div class="cdx-card-hdr">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="cdx-card-title">${e.name}</span>
+            ${e.hidden?`<span class="cdx-badge st-unknown">Hidden</span>`:""}
+          </div>
+        </div>${body}</div>`;
+    }).join("");
+  }
+
+  const isEmpty=!filtered.length;
+  return `<div class="cdx">
+    <div><div class="pgt">Codex</div><div class="pgs">GALACTIC INTELLIGENCE — REBEL CELL REFERENCE</div></div>
+    <div class="cdx-top">
+      <input class="cdx-search" placeholder="Search codex..." value="${codexSearch}" oninput="cdxSearch=this.value;render()">
+      <div class="cdx-tabs">
+        <button class="cdx-tab${codexTab==="npcs"?" active":""}" onclick="codexTab='npcs';render()">NPCs</button>
+        <button class="cdx-tab${codexTab==="planets"?" active":""}" onclick="codexTab='planets';render()">Planets</button>
+        <button class="cdx-tab${codexTab==="orgs"?" active":""}" onclick="codexTab='orgs';render()">Organizations</button>
+      </div>
+      ${isDM?`<button class="abtn" onclick="addCodexEntry('${codexTab}')">+ Add entry</button>`:""}
+    </div>
+    <div class="cdx-grid">${isEmpty?`<div style="font-size:13px;color:var(--txt3);padding:.5rem 0">${q?"No results for that search.":"No entries yet."}</div>`:cards}</div>
+  </div>`;
+}
+
+// Init codex on first load
+loadCodex().then(()=>render());
+
+// Init adv row visibility
+document.getElementById("advrow").style.display="flex";
+window.chars = chars;
+window.FACTION = FACTION;
+window.render = render;
+
+// Expose all interactive functions globally
+// (type="module" script blocks normal global scope)
+window.upd=upd;window.gc=gc;
+window.editAb=editAb;window.toggleProf=toggleProf;
+window.editAC=editAC;window.editInit=editInit;window.editSpd=editSpd;
+window.editMaxHP=editMaxHP;window.editMaxFP=editMaxFP;
+window.editName=editName;window.editSpecies=editSpecies;window.editCls=editCls;
+window.aHP=aHP;window.sHP=sHP;window.sTemp=sTemp;window.tFP=tFP;
+window.sCr=sCr;window.addItem=addItem;window.delItem=delItem;
+window.addWpn=addWpn;window.delWpn=delWpn;window.rollWpnDmg=rollWpnDmg;window.rollWpnAtk=rollWpnAtk;
+window.addDT=addDT;window.dDT=dDT;window.eDT=eDT;window.cDT=cDT;
+window.setBond=setBond;window.eRelNote=eRelNote;window.sNotes=sNotes;
+window.addCodexEntry=addCodexEntry;window.editCodexEntry=editCodexEntry;
+window.toggleHidden=toggleHidden;window.deleteCodexEntry=deleteCodexEntry;
+window.showPg=showPg;window.shTab=shTab;
+window.toggleDice=toggleDice;window.selDie=selDie;window.adjCount=adjCount;
+window.setAdv=setAdv;window.doRoll=doRoll;window.rollCustom=rollCustom;
+render();
+</script>
+</body>
+</html>
