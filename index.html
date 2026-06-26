@@ -7,6 +7,9 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const DM_EMAIL = "alexander.darthmoor@gmail.com";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB7N0A8eBdQVRhnD57GFOhdSNSR75yZLZg",
@@ -19,29 +22,80 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+// ── Auth state ─────────────────────────────────────────────────────────────
+let currentUser = null;
+window.isDM = () => currentUser && currentUser.email === DM_EMAIL;
+window.isAuthed = () => !!currentUser;
+
+window.requireAuth = function() {
+  if (currentUser) return true;
+  if (confirm("Sign in with Google to make changes?")) {
+    signInWithRedirect(auth, provider);
+  }
+  return false;
+};
+
+window.requireDM = function() {
+  if (window.isDM()) return true;
+  alert("Only the DM can edit this.");
+  return false;
+};
+
+window.doSignIn = () => signInWithRedirect(auth, provider);
+window.doSignOut = () => signOut(auth);
+
+function updateAuthUI(user) {
+  currentUser = user;
+  const btn = document.getElementById("authbtn");
+  const label = document.getElementById("authlabel");
+  const badge = document.getElementById("dmbadge");
+  if (!btn) return;
+  if (user) {
+    if (label) label.textContent = user.displayName || user.email;
+    btn.textContent = "Sign out";
+    btn.onclick = () => signOut(auth);
+    if (badge) badge.style.display = window.isDM() ? "inline" : "none";
+  } else {
+    if (label) label.textContent = "";
+    btn.textContent = "Sign in";
+    btn.onclick = () => signInWithRedirect(auth, provider);
+    if (badge) badge.style.display = "none";
+  }
+  if (window.render) window.render();
+}
+
+onAuthStateChanged(auth, user => updateAuthUI(user));
+
+// Handle redirect result on page load
+getRedirectResult(auth)
+  .then(result => { if (result?.user) updateAuthUI(result.user); })
+  .catch(e => console.warn("Redirect result:", e));
 
 // ── Fields that are live-synced per character ──────────────────────────────
 const LIVE_CHAR_FIELDS = ["hp","hpTemp","fp","credits","inv","wpns","dt","rels","notes"];
 
 // ── Push one character's live fields to Firestore ──────────────────────────
 async function pushChar(c) {
+  if (!currentUser) return;
   const payload = {};
-  LIVE_CHAR_FIELDS.forEach(f => { payload[f] = c[f]; });
+  LIVE_CHAR_FIELDS.forEach(f => { if (c[f] !== undefined) payload[f] = c[f]; });
   await setDoc(doc(db, "campaign", "chars_" + c.id), payload, { merge: true });
 }
 
 // ── Push faction stats to Firestore ───────────────────────────────────────
 async function pushFaction() {
+  if (!currentUser) return;
   await setDoc(doc(db, "campaign", "faction"), window.FACTION, { merge: true });
 }
 
-// ── Expose to global scope so existing onclick handlers can call them ──────
 window.fbPushChar = pushChar;
 window.fbPushFaction = pushFaction;
 
-// ── On load: pull Firestore data and merge into chars/FACTION, then render ─
+// ── On load: pull Firestore data and set up live listeners ────────────────
 async function loadFromFirestore() {
-  // Characters
   for (const c of window.chars) {
     try {
       const snap = await getDoc(doc(db, "campaign", "chars_" + c.id));
@@ -51,7 +105,6 @@ async function loadFromFirestore() {
       }
     } catch(e) { console.warn("Could not load char", c.id, e); }
   }
-  // Faction
   try {
     const snap = await getDoc(doc(db, "campaign", "faction"));
     if (snap.exists()) {
@@ -63,9 +116,9 @@ async function loadFromFirestore() {
   } catch(e) { console.warn("Could not load faction", e); }
 
   window.render();
-  document.getElementById("syncstatus").textContent = "LIVE — REBEL ALLIANCE ENCRYPTED";
+  const ss = document.getElementById("syncstatus");
+  if (ss) ss.textContent = "LIVE — REBEL ALLIANCE ENCRYPTED";
 
-  // ── Live listeners: re-render whenever Firestore changes ──────────────
   window.chars.forEach(c => {
     onSnapshot(doc(db, "campaign", "chars_" + c.id), snap => {
       if (!snap.exists()) return;
@@ -85,7 +138,6 @@ async function loadFromFirestore() {
   });
 }
 
-// Wait for the page script to set up chars/FACTION, then load
 window.addEventListener("appReady", loadFromFirestore);
 </script>
 <style>
@@ -276,6 +328,46 @@ table.wpn tr:last-child td{border-bottom:none}
   .nav{padding:0 .5rem}
   .evr{grid-template-columns:1fr;gap:.25rem}
 }
+/* Dice Roller */
+#dice-fab{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:var(--amber);border:none;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(212,135,58,.4);z-index:200;transition:transform .15s,box-shadow .15s}
+#dice-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(212,135,58,.55)}
+#dice-panel{position:fixed;bottom:84px;right:24px;width:300px;background:var(--s1);border:1px solid var(--bdr2);border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.6);z-index:199;display:none;flex-direction:column;overflow:hidden}
+#dice-panel.open{display:flex}
+.dp-hdr{padding:.6rem .9rem;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.dp-title{font-family:var(--fm);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.dp-close{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;transition:color .15s}
+.dp-close:hover{color:var(--txt)}
+.dp-dice{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:.75rem .9rem}
+.dp-die{background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:7px 3px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-family:var(--fm);font-size:10px;color:var(--txt3);letter-spacing:.05em}
+.dp-die:hover{border-color:var(--ab2);color:var(--amber);background:var(--aglow)}
+.dp-die.active{border-color:var(--amber);color:var(--amber);background:var(--aglow)}
+.dp-face{font-size:18px;display:block;margin-bottom:2px}
+.dp-adv{display:flex;gap:4px;padding:0 .9rem .65rem}
+.dp-advbtn{flex:1;font-family:var(--fm);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:5px 3px;border-radius:2px;border:1px solid var(--bdr2);background:none;color:var(--txt3);cursor:pointer;transition:all .15s}
+.dp-advbtn:hover{border-color:var(--ab2);color:var(--amber)}
+.dp-advbtn.adv-on{background:rgba(61,186,126,.12);border-color:rgba(61,186,126,.4);color:var(--green)}
+.dp-advbtn.dis-on{background:rgba(212,91,91,.1);border-color:rgba(212,91,91,.3);color:var(--red)}
+.dp-count{display:flex;align-items:center;gap:8px;padding:0 .9rem .65rem}
+.dp-clbl{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase}
+.dp-cbtn{width:22px;height:22px;border-radius:50%;border:1px solid var(--bdr2);background:var(--s2);color:var(--txt);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.dp-cbtn:hover{border-color:var(--amber);color:var(--amber)}
+.dp-cval{font-family:var(--fm);font-size:14px;color:var(--txtb);min-width:18px;text-align:center}
+.dp-roll{margin:.1rem .9rem .75rem;padding:9px;font-family:var(--fm);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--amber);color:var(--bg);border:none;border-radius:3px;cursor:pointer;font-weight:700;transition:opacity .15s}
+.dp-roll:hover{opacity:.88}
+.dp-result{margin:0 .9rem .75rem;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:10px 12px;text-align:center;display:none}
+.dp-result.show{display:block}
+.dp-total{font-family:var(--fd);font-size:40px;font-weight:700;color:var(--amber);line-height:1}
+.dp-total.crit{color:var(--green)}
+.dp-total.fail{color:var(--red)}
+.dp-breakdown{font-family:var(--fm);font-size:10px;color:var(--txt3);margin-top:3px;letter-spacing:.05em}
+.dp-label{font-family:var(--fm);font-size:9px;color:var(--txt2);margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
+.dp-hist{border-top:1px solid var(--bdr);max-height:140px;overflow-y:auto}
+.dp-hrow{display:flex;justify-content:space-between;align-items:baseline;padding:4px .9rem;border-bottom:1px solid var(--bdr);font-family:var(--fm);font-size:10px}
+.dp-hrow:last-child{border-bottom:none}
+.dp-hlbl{color:var(--txt3);font-size:9px}
+.dp-hval{color:var(--amber);font-weight:600}
+.dp-hval.hcrit{color:var(--green)}
+.dp-hval.hfail{color:var(--red)}
 </style>
 </head>
 <body>
@@ -284,10 +376,52 @@ table.wpn tr:last-child td{border-bottom:none}
     <div class="brand-eye">SW5e — OT Era Campaign</div>
     <div class="brand-name">Cell Registry</div>
   </div>
-  <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
+    <span id="authlabel" style="font-family:var(--fm);font-size:9px;color:var(--txt2);letter-spacing:.08em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <span id="dmbadge" style="display:none;font-family:var(--fm);font-size:8px;letter-spacing:.1em;text-transform:uppercase;background:rgba(212,135,58,.10);border:1px solid rgba(212,135,58,.20);color:var(--amber);padding:2px 7px;border-radius:2px">DM</span>
+    <button id="authbtn" style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid rgba(212,135,58,.26);border-radius:2px;color:var(--txt3);padding:4px 10px;cursor:pointer;transition:color .15s,border-color .15s" onmouseover="this.style.color='var(--amber)';this.style.borderColor='rgba(212,135,58,.45)'" onmouseout="this.style.color='var(--txt3)';this.style.borderColor='rgba(212,135,58,.26)'">Sign in</button>
+  </div>
 </header>
 <nav class="nav" id="nav"></nav>
 <main id="pages"></main>
+
+<!-- Dice Roller -->
+<button id="dice-fab" onclick="toggleDice()" title="Dice Roller">⚄</button>
+<div id="dice-panel">
+  <div class="dp-hdr">
+    <span class="dp-title">Dice Roller — Private</span>
+    <button class="dp-close" onclick="toggleDice()">×</button>
+  </div>
+  <div class="dp-dice">
+    <div class="dp-die" onclick="selDie(4)" id="die4"><span class="dp-face">▲</span>d4</div>
+    <div class="dp-die" onclick="selDie(6)" id="die6"><span class="dp-face">⬡</span>d6</div>
+    <div class="dp-die" onclick="selDie(8)" id="die8"><span class="dp-face">◆</span>d8</div>
+    <div class="dp-die" onclick="selDie(10)" id="die10"><span class="dp-face">⬟</span>d10</div>
+    <div class="dp-die" onclick="selDie(12)" id="die12"><span class="dp-face">⬠</span>d12</div>
+    <div class="dp-die active" onclick="selDie(20)" id="die20"><span class="dp-face">⬡</span>d20</div>
+    <div class="dp-die" onclick="selDie(100)" id="die100"><span class="dp-face">●</span>d100</div>
+    <div class="dp-die" onclick="rollCustom()" id="diecustom"><span class="dp-face">✎</span>custom</div>
+  </div>
+  <div class="dp-count">
+    <span class="dp-clbl">Dice</span>
+    <button class="dp-cbtn" onclick="adjCount(-1)">−</button>
+    <span class="dp-cval" id="dicecount">1</span>
+    <button class="dp-cbtn" onclick="adjCount(1)">+</button>
+  </div>
+  <div class="dp-adv" id="advrow">
+    <button class="dp-advbtn" id="advbtn" onclick="setAdv('adv')">Advantage</button>
+    <button class="dp-advbtn" id="disbtn" onclick="setAdv('dis')">Disadvantage</button>
+    <button class="dp-advbtn" id="norbtn" onclick="setAdv('nor')">Normal</button>
+  </div>
+  <button class="dp-roll" onclick="doRoll()">ROLL</button>
+  <div class="dp-result" id="dpresult">
+    <div class="dp-total" id="dptotal">—</div>
+    <div class="dp-breakdown" id="dpbreak"></div>
+    <div class="dp-label" id="dplabel"></div>
+  </div>
+  <div class="dp-hist" id="dphist"></div>
+</div>
 <script>
 const CHARS=[
   {id:"pc1",name:"Character One",species:"Human",cls:"Guardian 5 / Scout 2",em:"⚔️",lbl:"Guardian",col:"#d4873a",
@@ -458,6 +592,135 @@ function sNotes(id,val){
   c.notes=val;
   if(window.fbPushChar) window.fbPushChar(c);
 }
+
+// ── Dice Roller ───────────────────────────────────────────────────────────
+let diceState={die:20,count:1,adv:"nor"};
+let rollHistory=[];
+
+function toggleDice(){
+  const p=document.getElementById("dice-panel");
+  p.classList.toggle("open");
+}
+
+function selDie(n){
+  diceState.die=n;
+  diceState.count=1;
+  document.getElementById("dicecount").textContent=1;
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  const el=document.getElementById("die"+n);
+  if(el)el.classList.add("active");
+  // Only show adv/dis row for d20
+  document.getElementById("advrow").style.display=n===20?"flex":"none";
+}
+
+function adjCount(d){
+  diceState.count=Math.max(1,Math.min(20,diceState.count+d));
+  document.getElementById("dicecount").textContent=diceState.count;
+}
+
+function setAdv(mode){
+  diceState.adv=mode;
+  document.getElementById("advbtn").className="dp-advbtn"+(mode==="adv"?" adv-on":"");
+  document.getElementById("disbtn").className="dp-advbtn"+(mode==="dis"?" dis-on":"");
+  document.getElementById("norbtn").className="dp-advbtn";
+}
+
+function rollOne(sides){return Math.floor(Math.random()*sides)+1;}
+
+function doRoll(overrideDie,overrideCount,label){
+  const die=overrideDie||diceState.die;
+  const count=overrideCount||diceState.count;
+  const adv=diceState.adv;
+  let rolls=[];
+  let total=0;
+  let breakdown="";
+  let resultLabel=label||(count+"d"+die);
+  let isCrit=false;
+  let isFail=false;
+
+  if(die===20&&count===1&&adv!=="nor"){
+    const r1=rollOne(20);const r2=rollOne(20);
+    const chosen=adv==="adv"?Math.max(r1,r2):Math.min(r1,r2);
+    total=chosen;
+    breakdown=(adv==="adv"?"Adv":"Dis")+": ["+r1+", "+r2+"] → "+chosen;
+    isCrit=chosen===20;
+    isFail=chosen===1;
+    resultLabel+=(adv==="adv"?" (Advantage)":" (Disadvantage)");
+  } else {
+    for(let i=0;i<count;i++){const r=rollOne(die);rolls.push(r);total+=r;}
+    breakdown=rolls.join(" + ")+(count>1?" = "+total:"");
+    if(die===20&&count===1){isCrit=total===20;isFail=total===1;}
+  }
+
+  // Update result display
+  const res=document.getElementById("dpresult");
+  const tot=document.getElementById("dptotal");
+  const brk=document.getElementById("dpbreak");
+  const lbl=document.getElementById("dplabel");
+  res.classList.add("show");
+  tot.textContent=total;
+  tot.className="dp-total"+(isCrit?" crit":isFail?" fail":"");
+  brk.textContent=breakdown;
+  lbl.textContent=resultLabel+(isCrit?" — CRITICAL HIT!":isFail?" — CRITICAL FAIL":"");
+
+  // Add to history
+  rollHistory.unshift({label:resultLabel,total,isCrit,isFail,breakdown});
+  if(rollHistory.length>10)rollHistory.pop();
+  renderHistory();
+}
+
+function renderHistory(){
+  const h=document.getElementById("dphist");
+  if(!rollHistory.length){h.innerHTML="";return;}
+  h.innerHTML=rollHistory.map(r=>`<div class="dp-hrow"><span class="dp-hlbl">${r.label}</span><span class="dp-hval${r.isCrit?" hcrit":r.isFail?" hfail":""}">${r.total}${r.isCrit?" ★":r.isFail?" ✕":""}</span></div>`).join("");
+}
+
+function rollCustom(){
+  const input=prompt("Enter dice notation (e.g. 2d6, 1d8+3, 3d4):");
+  if(!input)return;
+  const match=input.trim().match(/^(\d+)d(\d+)([+-]\d+)?$/i);
+  if(!match){alert("Format: NdN or NdN+bonus (e.g. 2d6 or 1d8+3)");return;}
+  const count=parseInt(match[1]);
+  const die=parseInt(match[2]);
+  const bonus=parseInt(match[3]||0);
+  if(count<1||count>20||die<2){alert("Keep it between 1-20 dice and d2 minimum.");return;}
+  let rolls=[];let total=0;
+  for(let i=0;i<count;i++){const r=rollOne(die);rolls.push(r);total+=r;}
+  total+=bonus;
+  const breakdown=rolls.join(" + ")+(bonus!==0?(bonus>0?"+":"")+bonus:"")+(count>1||bonus!==0?" = "+total:"");
+  // Show result
+  const res=document.getElementById("dpresult");
+  const tot=document.getElementById("dptotal");
+  const brk=document.getElementById("dpbreak");
+  const lbl=document.getElementById("dplabel");
+  res.classList.add("show");
+  tot.textContent=total;
+  tot.className="dp-total";
+  brk.textContent=breakdown;
+  lbl.textContent=input.trim();
+  rollHistory.unshift({label:input.trim(),total,isCrit:false,isFail:false,breakdown});
+  if(rollHistory.length>10)rollHistory.pop();
+  renderHistory();
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  document.getElementById("diecustom").classList.add("active");
+}
+
+// Called from weapon damage click
+window.rollWpnDmg=function(id,idx){
+  const c=gc(id);
+  const w=c.wpns[idx];
+  const [num,die]=w.dmg.split("d").map(Number);
+  const atk=watkBonus(c,w);
+  // Open panel
+  document.getElementById("dice-panel").classList.add("open");
+  selDie(die);
+  diceState.count=num;
+  document.getElementById("dicecount").textContent=num;
+  doRoll(die,num,w.n+" dmg ("+w.dmg+" "+w.dtype+") atk:"+atk);
+};
+
+// Init adv row visibility
+document.getElementById("advrow").style.display="flex";
 
 // Expose globals for Firebase module to access
 window.chars = chars;
