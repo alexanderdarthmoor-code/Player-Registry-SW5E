@@ -109,6 +109,14 @@ async function pushFaction() {
 window.fbPushChar = pushChar;
 window.fbPushFaction = pushFaction;
 
+window.fbPushShipLocks = async function() {
+  if (!currentUser) return;
+  const locks = {};
+  window.SHIPS.forEach((s, i) => { locks["s" + i] = s.locked ? 1 : 0; });
+  try { await setDoc(doc(db, "campaign", "ship_locks"), locks, { merge: false }); }
+  catch(e) { console.warn("Ship locks save error", e); }
+};
+
 // Codex Firestore sync
 window.fbGetCodex = async function() {
   try {
@@ -143,6 +151,14 @@ async function loadFromFirestore() {
     }
   } catch(e) { console.warn("Could not load faction", e); }
 
+  try {
+    const snap = await getDoc(doc(db, "campaign", "ship_locks"));
+    if (snap.exists()) {
+      const d = snap.data();
+      window.SHIPS.forEach((s, i) => { if (d["s" + i] !== undefined) s.locked = d["s" + i] === 1; });
+    }
+  } catch(e) { console.warn("Could not load ship locks", e); }
+
   window.render();
   const ss = document.getElementById("syncstatus");
   if (ss) ss.textContent = "LIVE — REBEL ALLIANCE ENCRYPTED";
@@ -162,6 +178,13 @@ async function loadFromFirestore() {
     Object.keys(window.FACTION).forEach(k => {
       if (d[k] !== undefined) window.FACTION[k] = d[k];
     });
+    window.render();
+  });
+
+  onSnapshot(doc(db, "campaign", "ship_locks"), snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    window.SHIPS.forEach((s, i) => { if (d["s" + i] !== undefined) s.locked = d["s" + i] === 1; });
     window.render();
   });
 }
@@ -664,10 +687,137 @@ const CHARS=[
 const FACTION={Resources:{v:25,col:"#d4873a",d:"Credits, supplies, safe houses"},Morale:{v:40,col:"#3dba7e",d:"Cell cohesion & will to fight"},Influence:{v:30,col:"#9b7fe8",d:"Public & political reach"},Military:{v:30,col:"#d45b5b",d:"Combat strength & readiness"},Secrecy:{v:60,col:"#5b9bd5",d:"How hidden the cell remains"}};
 const EVENTS=[{s:1,t:"Veilwatch Extraction",d:"Rangers defected. Listening post destroyed.",e:"+10 Morale",pos:1},{s:1,t:"Tebo Station",d:"Crymorah confirmed. Slaves freed.",e:"+10 Influence",pos:1},{s:2,t:"Public Order Directive",d:"Imperial Emergency Act 746-22. Disappearances begin.",e:"−10 Influence",pos:0},{s:2,t:"Prison Barge X-103",d:"Detainees extracted. Inquisitor confirmed.",e:"+5 Morale, −5 Secrecy",pos:1},{s:2,t:"Ossus Holocron",d:"Master Varo Xel's star map fragment decoded.",e:"+10 Resources",pos:1}];
 const SHIPS=[
-  {badge:"r",faction:"Rebel Cell",name:"Harloen Ranger Patrol Craft",image:"",cls:"Modified Kom'rk-class Fighter/Transport",ac:14,hp:38,sp:20,regen:"6 (1d6)",spd:"300 ft.",abs:[16,14,14,12,10,8],traits:[{n:"Rangers' Loyalists",d:"When Colonel Chasid or Captain Celt is aboard, attack rolls gain +1 and advantage on saves vs. disabled or boarded."},{n:"Troop Transport",d:"Carries up to 10 passengers. They may fire from weapon ports as a bonus action."},{n:"Hardened Hull",d:"Resistance to ion damage."}],actions:[{t:"a",n:"Dual Turbolaser Cannons",u:"",d:"2 Ranged Ship Attacks: +4 to hit. 1d10+2 energy damage each."},{t:"a",n:"Concussion Missile Rack",u:"(3 uses)",d:"DC 15 Dex save. 2d10+2 energy, half on success. Crit: target speed −100 ft."},{t:"r",n:"Cover Formation",u:"(2 uses)",d:"When a friendly ship within 60 ft. is targeted, move up to 100 ft. toward it. If adjacent, attacker rerolls."},{t:"r",n:"Emergency Dump",u:"(1 use)",d:"When damage would drop ship to 0 HP, eject cargo to reduce damage by 10."}],pilot:"STR/CON or WIS primary. Captain Celt aboard: use his Tactical check instead of the pilot's for one attack per round."},
-  {badge:"vi",faction:"Virellian Allies",name:"Pale Meridian",image:"",cls:"Modified YT-1300 Light Freighter",ac:13,hp:52,sp:18,regen:"5 (1d6–1)",spd:"250 ft.",abs:[18,12,16,16,14,14],traits:[{n:"Diplomatic Registry",d:"DC 14 Deception or Persuasion to pass as Virellian trade vessel. DC 11 in Virellian-adjacent systems."},{n:"Hidden Cargo Bay",d:"DC 18 Investigation to detect. Hides 8 passengers or 2 tons of cargo."},{n:"Shielded Manifest",d:"Advantage on saves vs. ion weapons and slicing attempts."}],actions:[{t:"a",n:"Concealed Quad Laser Cannons",u:"",d:"2 Ranged Ship Attacks: +3 to hit. 1d8+2 each. Retracting covers costs bonus action first round."},{t:"a",n:"Sensor Scrambler Burst",u:"(2 uses)",d:"DC 14 INT save. Failure: no ranged attacks beyond 100 ft., disadvantage on Perception."},{t:"r",n:"Smuggler's Instinct",u:"(2 uses)",d:"DC 13 Piloting check. On success, attacker rolls with disadvantage."},{t:"r",n:"Emergency Hyperdrive",u:"(1 use/long rest)",d:"Reaction to damage: jump to hyperspace. Requires clear hyperlane."}],pilot:"INT and CHA primary. Mahna Tir: advantage on Piloting at full burn. Senator Allendor: DC 11 in Virellian systems."},
-  {badge:"vo",faction:"Vossar Jedi",name:"The Quiet Current",image:"",cls:"Modified VCX-100 Light Freighter",ac:14,hp:60,sp:30,regen:"8 (1d8)",spd:"275 ft.",abs:[16,14,18,18,20,16],traits:[{n:"Force-Calmed Hull",d:"Jedi crew may spend a Force Point as bonus action to restore 1d8 shield points."},{n:"Encrypted Vossar Comms",d:"DC 22 Technology to intercept. Imperial scanners disadvantage detecting comms."},{n:"Meditation Chamber",d:"Holocron Study or Force Meditation taken in hyperspace. DC −2."}],actions:[{t:"a",n:"Laser Cannon Battery",u:"",d:"3 Ranged Ship Attacks: +6 to hit. 1d8+4 each. Covers all arcs."},{t:"a",n:"Ion Disruptor",u:"(2 uses)",d:"DC 16 CON save. Failure: 2d6 ion + shields suppressed until end of next turn."},{t:"a",n:"Proton Torpedo",u:"(4 uses)",d:"DC 17 Dex save. 4d6+4 energy, half on success. Double damage to shields."},{t:"r",n:"Force-Guided Evasion",u:"(3 uses)",d:"Force-sensitive crew spends a Force Point: add WIS modifier to AC until attacker's next turn."},{t:"r",n:"Presence of the Vossar",u:"(1 use/long rest)",d:"When crew would fall to 0 HP, Aelix (if aboard) reduces damage to 1 HP."}],pilot:"WIS primary. Force-sensitive pilots use WIS for all Piloting checks. Kierra can activate Force-Calmed Hull even when not piloting."},
-  {badge:"r",faction:"Rebel Cell",name:"T-65 X-Wing (Fresia Prototype)",image:"",cls:"Incom T-65 X-Wing Starfighter",ac:16,hp:24,sp:22,regen:"7 (1d6+1)",spd:"375 ft.",abs:[12,18,12,18,14,10],traits:[{n:"S-Foils (Attack Position)",d:"Bonus action: advantage on first attack each round. Cruise: speed 450 ft., no torpedoes."},{n:"Astromech Co-Pilot",d:"Once per round, use astromech INT (+4) instead of your own for a Piloting check or attack roll."},{n:"Targeting Computer",d:"Once per combat: free Aim action vs. a target in visual range for at least one full round."}],actions:[{t:"a",n:"Quad Laser Cannons",u:"",d:"4 Ranged Ship Attacks: +6 to hit. 1d6+4 each. All 4 hit same target: DC 14 CON save or disadvantage on next attack."},{t:"a",n:"Proton Torpedo",u:"(6 uses)",d:"DC 18 Dex save. 4d8+4 energy, half on success. +2d6 vs. capital ships."},{t:"r",n:"Snap Roll",u:"(3 uses)",d:"Impose disadvantage on incoming attack. DC 12 Piloting — fail: move 50 ft. random direction."},{t:"r",n:"Target Lock Override",u:"(1 use)",d:"Redirect a missile/torpedo targeting a friendly ship within 300 ft. to yourself instead."}],pilot:"DEX and INT primary. Mahna Tir: advantage on all Piloting checks. Force-sensitive: spend a Force Point to use Targeting Computer without line-of-sight."}
+  {badge:"r",faction:"Rebel Cell",name:"T-65 X-Wing Starfighter",image:"",cls:"Incom Corporation T-65",locked:false,
+   ac:15,hp:28,sp:22,regen:"6 (1d6)",spd:"375 ft.",abs:[12,18,12,14,14,10],
+   statfx:[
+     {stat:"Pilot DEX mod",affects:"AC and all Piloting evasion checks"},
+     {stat:"Gunner DEX mod",affects:"Attack bonus on Quad Laser Cannons"},
+     {stat:"Pilot WIS mod",affects:"Snap Roll DC and initiative order"}
+   ],
+   traits:[
+     {n:"Astromech socket",d:"Astromech droid provides advantage on one Piloting or Navigation check per encounter."}
+   ],
+   actions:[
+     {t:"a",n:"Quad Laser Cannons",u:"",d:"Makes 2 ranged ship attacks: +6 to hit (+gunner DEX mod), range 500/1,000 ft. Hit: 1d8+3 energy damage each."},
+     {t:"a",n:"Proton Torpedoes",u:"(2 uses)",d:"DC 16 Dex save. Failure: 4d10+2 energy damage, or half on a success. Bypasses shields entirely — deals full damage to hull."},
+     {t:"r",n:"S-Foils: Attack Formation",u:"(3/short rest)",d:"Before the pilot's attack roll, split quad cannons into pairs. Make 4 attacks at +4 to hit (+gunner DEX mod), 1d8+1 energy each. Each may target a different ship."},
+     {t:"r",n:"Snap Roll",u:"(2 uses)",d:"When targeted by a ranged attack, impose disadvantage on that roll and move up to 50 ft. in any direction without provoking opportunity attacks. Pilot must succeed on DC 12 Piloting check or the move is halved."}
+   ],
+   pilot:"DEX primary for evasion and AC. Gunner DEX adds directly to all attack rolls. Best flown by a character with Piloting proficiency — the X-wing rewards aggressive, precise pilots."},
+
+  {badge:"r",faction:"Rebel Cell",name:"BTL-A4 Y-Wing Starfighter / Bomber",image:"",cls:"Koensayr Manufacturing BTL-A4",locked:false,
+   ac:13,hp:36,sp:18,regen:"5 (1d4+1)",spd:"275 ft.",abs:[14,12,16,12,16,8],
+   statfx:[
+     {stat:"Pilot WIS mod",affects:"Proton bomb drop accuracy (contested Piloting check)"},
+     {stat:"Gunner DEX mod",affects:"Attack bonus on Twin Laser Cannon and Ion Cannon Turret"},
+     {stat:"Engineer INT mod",affects:"Ion cannon turret targeting DC and repair checks mid-combat"}
+   ],
+   traits:[
+     {n:"Hardened frame",d:"Resistance to ion damage. Clone Wars construction — this thing has survived worse."}
+   ],
+   actions:[
+     {t:"a",n:"Twin Laser Cannon",u:"",d:"Makes 2 ranged ship attacks: +5 to hit (+gunner DEX mod), range 450/900 ft. Hit: 1d6+3 energy damage each."},
+     {t:"a",n:"Ion Cannon Turret",u:"(requires a separate gunner at the turret station)",d:"Makes 1 ranged ship attack: +4 to hit (+gunner DEX mod), range 600/1,200 ft. Hit: 2d6 ion damage. Shield regen suppressed and one chosen system offline until end of target's next turn."},
+     {t:"a",n:"Proton Bomb Drop",u:"(4 uses)",d:"DC 15 Dex save (+pilot WIS mod to the DC if pilot succeeds on a DC 13 Piloting check). Failure: 5d10 kinetic damage, or half on a success. Cannot target ships within 50 ft."},
+     {t:"r",n:"Suppressing Fire",u:"(2 uses)",d:"When an allied ship within 300 ft. is targeted, the Y-wing's gunner uses their reaction to make one Ion Cannon attack vs. the attacker. If it hits, the attacker's roll is made with disadvantage."}
+   ],
+   pilot:"WIS primary for bombing runs. A second crew member at the ion turret dramatically changes what this ship can do — the ion cannon is wasted unmanned. CON on the ship reflects its durability; don't mistake slow for weak."},
+
+  {badge:"r",faction:"Rebel Cell",name:"A/SF-01 B-Wing Starfighter",image:"",cls:"Slayn & Korpil A/SF-01",locked:true,
+   ac:13,hp:24,sp:30,regen:"10 (1d10)",spd:"250 ft.",abs:[16,10,14,12,10,8],
+   statfx:[
+     {stat:"Pilot DEX mod",affects:"AC — low ship DEX means the pilot's skill is the only edge"},
+     {stat:"Gunner STR mod",affects:"Ion Torpedo attack — heavy weapons use STR on this platform"},
+     {stat:"Pilot WIS mod",affects:"Gyroscopic cockpit orientation checks in unusual flight attitudes"}
+   ],
+   traits:[
+     {n:"Gyroscopic cockpit (passive)",d:"The pilot never has disadvantage on attacks or saves due to ship movement or positioning. When moved involuntarily, reduce that movement by up to 50 ft."}
+   ],
+   actions:[
+     {t:"a",n:"Autoblaster Cannons",u:"",d:"Makes 3 ranged ship attacks: +4 to hit (+gunner DEX mod), range 300/600 ft. Hit: 1d6+2 energy damage each."},
+     {t:"a",n:"Heavy Laser Cannon",u:"",d:"Makes 1 ranged ship attack: +5 to hit (+gunner DEX mod), range 700/1,400 ft. Hit: 3d8+3 energy damage. Can target Large ships or greater without penalty."},
+     {t:"a",n:"Ion Torpedoes",u:"(2 uses)",d:"DC 17 Str save. Failure: 3d10 ion damage, or half on a success. On a failed save, target's engines disabled until end of its next turn — cannot move or use reactions."},
+     {t:"r",n:"Shield Overcharge",u:"(1/long rest)",d:"When damage would drop shields to 0, release remaining shield energy in a burst. All ships within 50 ft. take 2d6 energy damage. B-Wing shields drop to 0."}
+   ],
+   pilot:"STR/CON platform — built for sustained punishment, not speed. The gyroscopic cockpit makes pilot DEX less critical than on fighters; what matters is nerve and endurance. Best for a patient, methodical pilot willing to absorb hits."},
+
+  {badge:"r",faction:"Rebel Cell",name:"UT-60D U-Wing Support Craft",image:"",cls:"Incom Corporation UT-60D",locked:true,
+   ac:12,hp:44,sp:16,regen:"5 (1d4+1)",spd:"225 ft.",abs:[18,10,16,10,12,12],
+   statfx:[
+     {stat:"Pilot DEX mod",affects:"AC and evasion — the U-wing's only real defensive edge is not being where it was"},
+     {stat:"Door gunner's personal DEX mod + ship STR mod (+4)",affects:"Door Gunner attack rolls"},
+     {stat:"Pilot WIS mod",affects:"Combat Extraction reaction timing (contested Insight vs. attacker's initiative)"}
+   ],
+   traits:[
+     {n:"Troop bay",d:"Carries up to 8 passengers in the main compartment. They may disembark in the same turn the U-wing lands or hovers at 10 ft."}
+   ],
+   actions:[
+     {t:"a",n:"Wing-Mounted Laser Cannons (×2)",u:"",d:"Makes 2 ranged ship attacks: +5 to hit (+pilot DEX mod), range 400/800 ft. Hit: 1d8+4 energy damage each."},
+     {t:"a",n:"Door Gunner",u:"(requires deployed crew member at an open door)",d:"Makes 1 ranged ship attack using the gunner's personal ranged attack modifier + ship STR mod (+4). Range 300/600 ft. Hit: weapon damage + 4 kinetic. Can target infantry, vehicles, and small craft simultaneously."},
+     {t:"a",n:"Swing Wing: Close Formation",u:"",d:"Wings close into attack configuration. Speed reduced to 150 ft. until start of next turn, but laser cannons deal an additional 1d6 energy damage per hit."},
+     {t:"r",n:"Combat Extraction",u:"(2 uses)",d:"When an allied creature within 100 ft. would be incapacitated or killed, swoop in range. That creature uses their reaction to board. The U-wing then moves up to its full speed immediately, even if it has already moved. Pilot must succeed on DC 13 Piloting check or the extraction move is halved."},
+     {t:"r",n:"Suppressive Approach",u:"(2 uses)",d:"When moving toward a target zone, fire both cannons at a 30 ft. diameter ground area. All creatures make DC 13 Dex save or drop prone and lose reactions until start of their next turn."}
+   ],
+   pilot:"Protect this ship. It has the highest STR and CON in the fleet — it can take hits — but it cannot fight its way out of trouble and everyone knows it. The Combat Extraction reaction is worth more than any weapon system on board. Pilot DEX is the only thing keeping its AC above 12."},
+
+  {badge:"r",faction:"Rebel Cell",name:"CR90 Corellian Corvette",image:"",cls:"Corellian Engineering Corporation CR90",locked:true,
+   ac:14,hp:120,sp:80,regen:"16 (2d10+6)",spd:"175 ft.",abs:[22,10,18,16,12,14],
+   statfx:[
+     {stat:"Gunner DEX mod",affects:"Turbolaser Battery attack rolls — capital ship gunners use DEX for precision targeting"},
+     {stat:"Ops officer INT mod",affects:"Tractor beam save DC (+INT mod added to base DC 15) and Point-Defense targeting"},
+     {stat:"Pilot WIS mod",affects:"Emergency Jump timing — contested vs. Imperial pursuit Navigation check"},
+     {stat:"Commander CHA mod",affects:"Full Broadside reaction — crew coordination under fire requires Leadership (CHA) check DC 12"}
+   ],
+   traits:[
+     {n:"Capital ship hardening",d:"Immune to being restrained by ships of Medium size or smaller. Resistance to ion damage."},
+     {n:"Diplomatic transponder",d:"In non-combat contexts, DC 16 Investigation to identify as a rebel vessel rather than registered civilian traffic."}
+   ],
+   actions:[
+     {t:"a",n:"Turbolaser Battery (×2)",u:"",d:"Makes 1 ranged ship attack per battery: +8 to hit (+gunner DEX mod), range 2,000/4,000 ft. Hit: 4d10+6 energy damage. Deals double damage against shields."},
+     {t:"a",n:"Point-Defense Laser Array",u:"",d:"Choose up to 3 targets within 500 ft. Each makes DC 15 Dex save (+ops INT mod to DC) or takes 2d6+4 energy damage (half on success). Can destroy incoming missiles on a failed save."},
+     {t:"a",n:"Tractor Beam",u:"(2/long rest)",d:"Range 1,000 ft. One ship of Large size or smaller makes DC 15 Str save (+ops INT mod to DC) or is restrained. The corvette may move the restrained ship up to 100 ft. per turn as a free action."},
+     {t:"r",n:"Emergency Jump",u:"(1/long rest)",d:"If this ship drops below 40 HP, the crew may initiate an emergency hyperspace jump. Pilot makes DC 14 Piloting check (+WIS mod). On success: ship vanishes at end of current round, reappears at safe coordinate 1d4 hours later. On fail: jump delayed one full round."},
+     {t:"r",n:"Full Broadside",u:"(1/short rest)",d:"When a ship moves within 500 ft., the corvette may fire both turbolaser batteries simultaneously outside of its normal turn. Requires DC 12 Leadership (CHA) check by the commanding officer — fail and only one battery fires."}
+   ],
+   pilot:"This is not a fighter. The day the cell puts the CR90 in a dogfight is a campaign-level mistake. It exists to support, evacuate, and threaten — its three actions make it a force multiplier. INT and CHA govern its most powerful systems. Losing it is not an option."},
+
+  {badge:"r",faction:"Rebel Cell",name:"Porcelain Porg — YT-2400 Light Freighter",image:"",cls:"Corellian Engineering Corporation YT-2400",locked:false,
+   ac:12,hp:64,sp:28,regen:"7 (1d6+1)",spd:"225 ft.",abs:[20,10,18,16,14,16],
+   statfx:[
+     {stat:"Pilot DEX mod",affects:"AC and Punch It reaction speed — the Porg's only evasive edge"},
+     {stat:"Engineer INT mod",affects:"Sensor Scrambler DC and It'll Hold repair check (DC 14 Technology)"},
+     {stat:"Gunner DEX mod",affects:"Concealed turret attack rolls"},
+     {stat:"CHA mod of highest-CHA crew member",affects:"Convincing IFF transponder checks and port authority bluffing"}
+   ],
+   traits:[
+     {n:"Concealed armament",d:"Until the turret fires for the first time in an encounter, enemies who haven't previously engaged the Porg do not know it is armed. They may not target it preferentially over civilian traffic."},
+     {n:"Modified hyperdrive (x0.5 rated)",d:"Navigation checks made at advantage. Transit time halved. Also means the thing is held together with hope and wire — any Critical Hit on the hull forces an immediate DC 13 CON save (ship's CON) or one random system goes offline."}
+   ],
+   actions:[
+     {t:"a",n:"Concealed Double Laser Turret",u:"",d:"Makes 2 ranged ship attacks: +6 to hit (+gunner DEX mod), range 500/1,000 ft. Hit: 1d8+5 energy damage each."},
+     {t:"a",n:"Sensor Scrambler",u:"(3/long rest)",d:"Choose one ship within 1,000 ft. Until start of the Porg's next turn, that ship cannot make ranged attacks against targets it cannot see within 50 ft. DC 15 Technology check (+attacker's INT mod) by target's crew ends the effect early."},
+     {t:"a",n:"Emergency Cargo Dump",u:"",d:"Release debris behind the ship. Any ship moving through the 50 ft. rear zone makes DC 13 Dex save or takes 2d6 kinetic damage and has speed halved until end of its next turn."},
+     {t:"r",n:"It'll Hold",u:"(3/long rest)",d:"When the Porg would take damage, roll 1d12. On 7+, reduce damage by that result. On 6 or lower, a random system is damaged: roll 1d4 (1 — engines: speed halved; 2 — weapons: turret offline; 3 — shields: regen suppressed; 4 — sensors: disadvantage on INT checks). Repair requires DC 14 Technology check (+engineer INT mod)."},
+     {t:"r",n:"Punch It",u:"(2/long rest)",d:"When a hostile ship moves within 100 ft. or the Porg would drop below 20 HP, immediately move up to full speed in any direction, ignoring opportunity attacks. Pilot must succeed on DC 11 Piloting check (+DEX mod) or the burst move is in a random direction."}
+   ],
+   pilot:"The Porg is home — CHA 16 because she has a personality and the crew knows it. High CON and STR mean she can absorb punishment; low DEX means she cannot dodge it. The engineer's INT is as important as the pilot's DEX here. It'll Hold is what keeps her flying."},
+
+  {badge:"r",faction:"Rebel Cell",name:"Cutlass-9 Patrol Fighter",image:"",cls:"Subpro Corporation Cutlass-9",locked:false,
+   ac:14,hp:18,sp:14,regen:"5 (1d4+1)",spd:"325 ft.",abs:[10,16,10,10,14,8],
+   statfx:[
+     {stat:"Pilot DEX mod",affects:"AC, Evasive Burn reaction, and all attack rolls — this ship is pure DEX"},
+     {stat:"Pilot WIS mod",affects:"Patrol Pattern — noticing when an ally needs escort cover (DC 10 Perception)"},
+     {stat:"Pilot DEX mod",affects:"Concussion Missile targeting — pilot fires missiles directly, no separate gunner station"}
+   ],
+   traits:[
+     {n:"Patrol Pattern (passive)",d:"When the Cutlass-9 ends its turn within 100 ft. of an allied ship, both ships gain +1 AC until the start of the Cutlass-9's next turn. This reflects years of Ranger formation training — it works because the pilots know each other."}
+   ],
+   actions:[
+     {t:"a",n:"Dual Laser Cannon",u:"",d:"Makes 2 ranged ship attacks: +5 to hit (+pilot DEX mod), range 400/800 ft. Hit: 1d6+3 energy damage each."},
+     {t:"a",n:"Concussion Missile",u:"(2 uses)",d:"DC 15 Dex save. Failure: 3d8+2 kinetic damage, or half on a success. Pilot's DEX mod adds to the save DC if the pilot succeeds on a DC 12 Piloting check before firing."},
+     {t:"r",n:"Evasive Burn",u:"(3/short rest)",d:"When targeted by an attack, the pilot uses their reaction to boost hard. The attack is made with disadvantage. The Cutlass-9 then moves 75 ft. in any direction after the attack resolves (+pilot DEX mod × 10 ft. additional movement), even if it has already moved this turn."}
+   ],
+   pilot:"Pure DEX platform — everything this ship does comes back to the pilot's Dexterity and Piloting proficiency. The Harloen Rangers have flown these for years; a Ranger pilot in a Cutlass-9 is more dangerous than their stat block suggests. Patrol Pattern is free AC for any nearby ally — keep one close to the U-wing."}
 ];
 let chars=JSON.parse(JSON.stringify(CHARS));
 let activePg="char_pc1";
@@ -871,17 +1021,32 @@ function renderOps(){
   const evs=EVENTS.map((e,i)=>`<div class="evr" style="border-bottom:${i<EVENTS.length-1?"1px solid var(--bdr)":"none"}"><div class="evs">Sess. ${e.s}</div><div><div class="evt">${e.t}</div><div class="evd">${e.d}</div></div><span class="eve ${e.pos?"ep":"en"}">${e.e}</span></div>`).join("");
   return `<div class="opspg"><div><div class="pgt">Operations</div><div class="pgs">REBEL CELL — DOWNTIME LOG &amp; FACTION STATUS</div></div><div class="sec"><div class="sch"><span class="sct">Cell Faction Stats</span></div><div class="scb"><div class="fsg">${fsc}</div><div style="margin-top:7px;font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div><div class="sec"><div class="sch"><span class="sct">Downtime Log — Current Arc</span></div><div class="scb">${charDt}</div></div><div class="sec"><div class="sch"><span class="sct">Galactic Event Log</span></div><div class="scb"><div>${evs}</div></div></div></div>`;
 }
+function toggleShipLock(idx){
+  if(!(window.requireDM&&window.requireDM()))return;
+  SHIPS[idx].locked=!SHIPS[idx].locked;
+  if(window.fbPushShipLocks) window.fbPushShipLocks();
+  render();
+}
+window.toggleShipLock=toggleShipLock;
 function renderShips(){
   const bmap={r:"sfbr",vi:"sfbvi",vo:"sfbv"};
+  const unlockedCount=SHIPS.filter(s=>!s.locked).length;
   const cards=SHIPS.map((s,i)=>{
     const uid="sh"+i;
+    const isDM=(window.isDM&&window.isDM());
+    const lockBtn=isDM?`<button class="abtn" style="margin-left:auto;${s.locked?"color:var(--red);border-color:rgba(212,91,91,.3)":"color:var(--green);border-color:rgba(61,186,126,.3)"}" onclick="toggleShipLock(${i})">${s.locked?"🔒 LOCKED":"🔓 ACQUIRED"}</button>`:`<span style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:2px;margin-left:auto;${s.locked?"color:var(--red);border:1px solid rgba(212,91,91,.3);background:rgba(212,91,91,.06)":"color:var(--green);border:1px solid rgba(61,186,126,.3);background:rgba(61,186,126,.06)"}">${s.locked?"NOT YET ACQUIRED":"ACQUIRED"}</span>`;
+    if(s.locked){
+      const shipImg=s.image?`<img class="ship-img" src="${s.image}" alt="${s.name}" style="opacity:.35;filter:grayscale(1)">`:`<div class="ship-img-placeholder" style="opacity:.35"><span class="ship-img-placeholder-icon">🔒</span><span class="ship-img-placeholder-lbl">NOT YET ACQUIRED</span></div>`;
+      return `<div class="shpc" style="opacity:.6"><div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(0,0,0,.08) 6px,rgba(0,0,0,.08) 12px);z-index:1;pointer-events:none"></div>${shipImg}<div class="shch"><div style="display:flex;align-items:center;gap:6px"><span class="sfb ${bmap[s.badge]||"sfbr"}">${s.faction}</span>${lockBtn}</div><div class="shn" style="opacity:.6">${s.name}</div><div class="shcl">${s.cls}</div></div><div style="padding:.85rem 1rem;font-family:var(--fm);font-size:10px;color:var(--txt3);letter-spacing:.1em;text-align:center;text-transform:uppercase">Ship not yet acquired by the cell</div></div>`;
+    }
     const abstr=s.abs.map((v,j)=>`<div class="sab"><div class="sabn">${ABKEYS[j]}</div><div class="sabs">${v}</div><div class="sabm">${ms(Math.floor((v-10)/2))}</div></div>`).join("");
     const acts=s.actions.filter(a=>a.t==="a");
     const reacts=s.actions.filter(a=>a.t==="r");
     const shipImg=s.image?`<img class="ship-img" src="${s.image}" alt="${s.name}">`:`<div class="ship-img-placeholder"><span class="ship-img-placeholder-icon">🚀</span><span class="ship-img-placeholder-lbl">${s.cls}</span></div>`;
-    return `<div class="shpc">${shipImg}<div class="shch"><span class="sfb ${bmap[s.badge]||"sfbr"}">${s.faction}</span><div class="shn">${s.name}</div><div class="shcl">${s.cls}</div></div><div class="shtabs"><button class="shtab active" onclick="shTab('${uid}','st',this)">Stats</button><button class="shtab" onclick="shTab('${uid}','wp',this)">Weapons</button><button class="shtab" onclick="shTab('${uid}','pi',this)">Pilot</button></div><div id="${uid}_st" class="shpn active"><div class="shsr">${[["AC",s.ac],["HP",s.hp],["Shields",s.sp],["Regen",s.regen],["Speed",s.spd]].map(([l,v])=>`<div class="shst"><div class="sssv">${v}</div><div class="sssl">${l}</div></div>`).join("")}</div><div class="shbl"><span>Hull</span><span>${s.hp} HP</span></div><div class="shb"><div style="height:100%;border-radius:2px;background:#3dba7e;width:${Math.round(s.hp/80*100)}%"></div></div><div class="shbl"><span>Shields</span><span>${s.sp} SP</span></div><div class="shb"><div style="height:100%;border-radius:2px;background:#5b9bd5;width:${Math.round(s.sp/50*100)}%"></div></div><div class="shab">${abstr}</div><div class="shsl">Ship Traits</div>${s.traits.map(t=>`<div class="shtr"><strong style="color:var(--txtb)">${t.n}.</strong> ${t.d}</div>`).join("")}</div><div id="${uid}_wp" class="shpn"><div class="shsl">Actions</div>${acts.map((a,j)=>`<div class="shac" style="border-bottom:${j<acts.length-1?"1px solid var(--bdr)":"none"}"><div class="shah"><span class="shan">${a.n}</span><span class="shau">${a.u}</span><span class="shat">Action</span></div><div class="shad">${a.d}</div></div>`).join("")}<div class="shsl" style="margin-top:.75rem">Reactions</div>${reacts.map((a,j)=>`<div class="shac" style="border-bottom:${j<reacts.length-1?"1px solid var(--bdr)":"none"}"><div class="shah"><span class="shan">${a.n}</span><span class="shau">${a.u}</span><span class="shat">Reaction</span></div><div class="shad">${a.d}</div></div>`).join("")}</div><div id="${uid}_pi" class="shpn"><div class="pilotnote"><strong>Pilot Guidance</strong>${s.pilot}</div></div></div>`;
+    const statfxHtml=s.statfx&&s.statfx.length?`<div class="shsl" style="margin-top:.65rem;color:var(--purple);border-color:rgba(155,127,232,.3)">Player Stats → Ship Effects</div>${s.statfx.map(fx=>`<div style="display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:start;margin-bottom:5px"><span style="font-family:var(--fm);font-size:9px;color:var(--purple);letter-spacing:.06em;padding:2px 6px;border-radius:2px;border:1px solid rgba(155,127,232,.25);background:rgba(155,127,232,.08);white-space:nowrap">${fx.stat}</span><span style="font-size:11px;color:var(--txt2);line-height:1.4">→ ${fx.affects}</span></div>`).join("")}`:"";
+    return `<div class="shpc">${shipImg}<div class="shch"><div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span class="sfb ${bmap[s.badge]||"sfbr"}">${s.faction}</span>${lockBtn}</div><div class="shn">${s.name}</div><div class="shcl">${s.cls}</div></div><div class="shtabs"><button class="shtab active" onclick="shTab('${uid}','st',this)">Stats</button><button class="shtab" onclick="shTab('${uid}','wp',this)">Weapons</button><button class="shtab" onclick="shTab('${uid}','pi',this)">Pilot</button></div><div id="${uid}_st" class="shpn active"><div class="shsr">${[["AC",s.ac],["HP",s.hp],["Shields",s.sp],["Regen",s.regen],["Speed",s.spd]].map(([l,v])=>`<div class="shst"><div class="sssv">${v}</div><div class="sssl">${l}</div></div>`).join("")}</div><div class="shbl"><span>Hull</span><span>${s.hp} HP</span></div><div class="shb"><div style="height:100%;border-radius:2px;background:#3dba7e;width:${Math.round(s.hp/120*100)}%"></div></div><div class="shbl"><span>Shields</span><span>${s.sp} SP</span></div><div class="shb"><div style="height:100%;border-radius:2px;background:#5b9bd5;width:${Math.round(s.sp/80*100)}%"></div></div><div class="shab">${abstr}</div>${statfxHtml}<div class="shsl" style="margin-top:.65rem">Ship Traits</div>${s.traits.map(t=>`<div class="shtr"><strong style="color:var(--txtb)">${t.n}.</strong> ${t.d}</div>`).join("")}</div><div id="${uid}_wp" class="shpn"><div class="shsl">Actions</div>${acts.map((a,j)=>`<div class="shac" style="border-bottom:${j<acts.length-1?"1px solid var(--bdr)":"none"}"><div class="shah"><span class="shan">${a.n}</span><span class="shau">${a.u}</span><span class="shat">Action</span></div><div class="shad">${a.d}</div></div>`).join("")}<div class="shsl" style="margin-top:.75rem">Reactions</div>${reacts.map((a,j)=>`<div class="shac" style="border-bottom:${j<reacts.length-1?"1px solid var(--bdr)":"none"}"><div class="shah"><span class="shan">${a.n}</span><span class="shau">${a.u}</span><span class="shat">Reaction</span></div><div class="shad">${a.d}</div></div>`).join("")}</div><div id="${uid}_pi" class="shpn"><div class="pilotnote"><strong>Pilot Guidance</strong>${s.pilot}</div></div></div>`;
   }).join("");
-  return `<div class="shpg"><div style="padding:.9rem 0 .75rem"><div class="pgt">Cell Ships</div><div class="pgs">REBEL ALLIANCE — REGISTERED VESSELS</div></div><div class="shgg">${cards}</div></div>`;
+  return `<div class="shpg"><div style="padding:.9rem 0 .75rem;display:flex;align-items:baseline;gap:12px"><div><div class="pgt">Cell Ships</div><div class="pgs">REBEL ALLIANCE — REGISTERED VESSELS</div></div><span style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;margin-left:auto">${unlockedCount}/${SHIPS.length} ACQUIRED${(window.isDM&&window.isDM())?" · CLICK STATUS TO TOGGLE":""}</span></div><div class="shgg">${cards}</div></div>`;
 }
 function shTab(uid,pane,btn){["st","wp","pi"].forEach(p=>{const el=document.getElementById(uid+"_"+p);if(el)el.classList.toggle("active",p===pane)});btn.closest(".shtabs").querySelectorAll(".shtab").forEach(b=>b.classList.remove("active"));btn.classList.add("active")}
 function buildNav(){let h="";chars.forEach(c=>{h+=`<button class="nb${activePg==="char_"+c.id?" active":""}" onclick="showPg('char_${c.id}',this)">${c.name.split(" ")[0]}</button>`});h+=`<div class="ndiv"></div>`;h+=`<button class="nb${activePg==="ops"?" active":""}" onclick="showPg('ops',this)">Operations</button>`;h+=`<button class="nb${activePg==="ships"?" active":""}" onclick="showPg('ships',this)">Ships</button>`;h+=`<button class="nb${activePg==="codex"?" active":""}" onclick="showPg('codex',this)">Codex</button>`;document.getElementById("nav").innerHTML=h}
@@ -1630,6 +1795,7 @@ loadCodex().then(()=>render());
 document.getElementById("advrow").style.display="flex";
 window.chars = chars;
 window.FACTION = FACTION;
+window.SHIPS = SHIPS;
 window.render = render;
 
 // Expose all interactive functions globally
@@ -1652,6 +1818,7 @@ window.addDT=addDT;window.dDT=dDT;window.eDT=eDT;window.cDT=cDT;
 window.setBond=setBond;window.eRelNote=eRelNote;window.sNotes=sNotes;
 window.addCodexEntry=addCodexEntry;window.editCodexEntry=editCodexEntry;
 window.toggleHidden=toggleHidden;window.deleteCodexEntry=deleteCodexEntry;
+window.toggleShipLock=toggleShipLock;
 window.showPg=showPg;window.shTab=shTab;
 window.toggleDice=toggleDice;window.selDie=selDie;window.adjCount=adjCount;
 window.setAdv=setAdv;window.doRoll=doRoll;window.rollCustom=rollCustom;
