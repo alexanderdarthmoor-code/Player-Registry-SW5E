@@ -243,6 +243,52 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .pwn{font-size:13px;font-weight:500;color:var(--txtb)}
 .pwd{font-size:11px;color:var(--txt2);margin-top:2px;line-height:1.4}
 .pwc{font-family:var(--fm);font-size:10px;color:var(--purple);white-space:nowrap}
+/* Combat Force Powers */
+table.fpwr{width:100%;border-collapse:collapse;margin-bottom:.65rem}
+table.fpwr th{font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);text-align:left;padding:3px 6px;border-bottom:1px solid var(--bdr)}
+table.fpwr td{font-size:12px;color:var(--txt);padding:5px 6px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+table.fpwr tr:last-child td{border-bottom:none}
+.fpwr-atk{font-family:var(--fm);font-size:11px;color:var(--green);cursor:pointer;padding:2px 6px;border-radius:2px;border:1px solid rgba(61,186,126,.3);background:rgba(61,186,126,.08);white-space:nowrap;transition:background .15s}
+.fpwr-atk:hover{background:rgba(61,186,126,.18)}
+.fpwr-dmg{font-family:var(--fm);font-size:11px;color:var(--purple);cursor:pointer;padding:2px 6px;border-radius:2px;border:1px solid rgba(155,127,232,.3);background:rgba(155,127,232,.08);white-space:nowrap;transition:background .15s}
+.fpwr-dmg:hover{background:rgba(155,127,232,.18)}
+/* Utility powers list */
+.upwr{display:flex;align-items:start;gap:.6rem;padding:5px 0;border-bottom:1px solid var(--bdr)}
+.upwr:last-child{border-bottom:none}
+/* Power picker modal */
+.ppkr-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:none;align-items:center;justify-content:center;padding:1.5rem}
+.ppkr-bg.open{display:flex}
+.ppkr{background:var(--s1);border:1px solid var(--bdr2);border-radius:4px;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column}
+.ppkr-hdr{padding:.7rem 1rem;background:var(--s2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ppkr-title{font-family:var(--fm);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.ppkr-close{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:20px;line-height:1}
+.ppkr-close:hover{color:var(--txt)}
+.ppkr-search{padding:.65rem 1rem;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.ppkr-input{width:100%;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:7px 10px;font-family:var(--fb);font-size:13px;color:var(--txt);outline:none;transition:border-color .15s}
+.ppkr-input:focus{border-color:var(--ab2)}
+.ppkr-filters{display:flex;gap:4px;margin-top:6px}
+.ppkr-filter{font-family:var(--fm);font-size:9px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--bdr);border-radius:2px;color:var(--txt3);padding:3px 8px;cursor:pointer;transition:all .15s}
+.ppkr-filter:hover{color:var(--txt);border-color:var(--bdr2)}
+.ppkr-filter.active{color:var(--amber);border-color:var(--ab2);background:var(--aglow)}
+.ppkr-list{overflow-y:auto;flex:1}
+.ppkr-item{padding:.65rem 1rem;border-bottom:1px solid var(--bdr);cursor:pointer;transition:background .15s}
+.ppkr-item:hover{background:var(--s2)}
+.ppkr-item:last-child{border-bottom:none}
+.ppkr-item-name{font-size:13px;font-weight:500;color:var(--txtb);margin-bottom:2px}
+.ppkr-item-meta{display:flex;gap:6px;align-items:center;margin-bottom:3px;flex-wrap:wrap}
+.ppkr-item-desc{font-size:11px;color:var(--txt2);line-height:1.5}
+.ppkr-loading{padding:2rem;text-align:center;font-family:var(--fm);font-size:10px;color:var(--txt3);letter-spacing:.1em}
+.ppkr-combat{padding:.65rem 1rem;border-top:1px solid var(--bdr);background:var(--s2);flex-shrink:0}
+.ppkr-combat-title{font-family:var(--fm);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--adim);margin-bottom:8px}
+.ppkr-combat-row{display:flex;gap:.65rem;flex-wrap:wrap}
+/* Villain threat */
+.threat-critical{color:#ff4444;border:1px solid rgba(255,68,68,.3);background:rgba(255,68,68,.08)}
+.threat-high{color:var(--red);border:1px solid rgba(212,91,91,.3);background:rgba(212,91,91,.08)}
+.threat-moderate{color:var(--amber);border:1px solid var(--ab);background:var(--aglow)}
+.threat-low{color:var(--txt2);border:1px solid var(--bdr)}
+/* Status toggle */
+.status-toggle{cursor:pointer;transition:opacity .15s}
+.status-toggle:hover{opacity:.75}
 .pwt{font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:2px;border:1px solid var(--bdr);color:var(--txt3);white-space:nowrap;text-transform:uppercase}
 table.inv{width:100%;border-collapse:collapse}
 table.inv th{font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);text-align:left;padding:3px 6px;border-bottom:1px solid var(--bdr)}
@@ -502,6 +548,44 @@ table.wpn tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- Force Power Picker -->
+<div class="ppkr-bg" id="ppkrModal" onclick="if(event.target===this)closePowerPicker()">
+  <div class="ppkr">
+    <div class="ppkr-hdr">
+      <span class="ppkr-title">Force Power Database — SW5e</span>
+      <button class="ppkr-close" onclick="closePowerPicker()">×</button>
+    </div>
+    <div class="ppkr-search">
+      <input class="ppkr-input" id="ppkrSearch" placeholder="Search force powers..." oninput="filterPowers()">
+      <div class="ppkr-filters">
+        <button class="ppkr-filter active" id="pf-all" onclick="setPowerFilter('all')">All</button>
+        <button class="ppkr-filter" id="pf-universal" onclick="setPowerFilter('universal')">Universal</button>
+        <button class="ppkr-filter" id="pf-light" onclick="setPowerFilter('light')">Light</button>
+        <button class="ppkr-filter" id="pf-dark" onclick="setPowerFilter('dark')">Dark</button>
+      </div>
+    </div>
+    <div class="ppkr-list" id="ppkrList"><div class="ppkr-loading">LOADING FORCE POWER DATABASE...</div></div>
+    <div class="ppkr-combat" id="ppkrCombat" style="display:none">
+      <div class="ppkr-combat-title">Combat Options — <span id="ppkrSelectedName" style="color:var(--amber)"></span></div>
+      <div class="ppkr-combat-row">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--txt);cursor:pointer">
+          <input type="checkbox" id="ppkrHasAtk" style="accent-color:var(--amber)"> Requires attack roll
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--txt);cursor:pointer">
+          <input type="checkbox" id="ppkrHasDmg" onchange="toggleDmgInput()" style="accent-color:var(--amber)"> Deals damage
+        </label>
+        <div id="ppkrDmgInput" style="display:none;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input id="ppkrDmgDice" placeholder="e.g. 2d6" style="width:70px;background:var(--s1);border:1px solid var(--bdr2);border-radius:3px;padding:4px 7px;font-family:var(--fm);font-size:11px;color:var(--txt);outline:none">
+          <select id="ppkrDmgType" style="background:var(--s1);border:1px solid var(--bdr2);border-radius:3px;padding:4px 7px;font-family:var(--fm);font-size:11px;color:var(--txt);outline:none">
+            <option>Energy</option><option>Kinetic</option><option>Ion</option><option>Fire</option><option>Cold</option><option>Lightning</option><option>Necrotic</option><option>Psychic</option>
+          </select>
+        </div>
+      </div>
+      <button class="abtn" style="margin-top:8px;color:var(--amber);border-color:var(--ab2)" onclick="confirmAddPower()">Add to character</button>
+    </div>
+  </div>
+</div>
+
 <!-- Dice Roller -->
 <button id="dice-fab" onclick="toggleDice()" title="Dice Roller">⚄</button>
 <div id="dice-panel">
@@ -650,7 +734,22 @@ function renderChar(c){
   const abItems=Object.entries(c.abs).map(([k,[s,m]])=>`<div class="abb" onclick="editAb('${c.id}','${k}')" style="cursor:pointer" title="Click to edit"><div class="abn">${k}</div><div class="absc">${s}</div><div class="abm">${ms(m)}</div></div>`).join("");
   const saves=c.saves.map((s,i)=>`<div class="skr" onclick="toggleProf('${c.id}','save',${i})" style="cursor:pointer" title="Click to toggle proficiency"><div class="skp${s.p?" pr":""}"></div><span>${s.n}</span><span class="skv">${s.m}</span></div>`).join("");
   const skills=c.skills.map((s,i)=>`<div class="skr" onclick="toggleProf('${c.id}','skill',${i})" style="cursor:pointer" title="Click to toggle proficiency"><div class="skp${s.e?" ex":s.p?" pr":""}"></div><span>${s.n}</span><span class="skv">${s.m}</span></div>`).join("");
-  const powers=c.powers.map((p,i)=>`<div class="pwr" style="border-bottom:${i<c.powers.length-1?"1px solid var(--bdr)":"none"}"><div><div class="pwn">${p.n}</div><div class="pwd">${p.d}</div></div><div class="pwc">${p.c}</div><div class="pwt">${p.t}</div></div>`).join("");
+  const wisMod=mod(c.abs.WIS[0]);
+  const forceAtk=ms(wisMod+PROF);
+  const combatPowers=c.powers.filter(p=>p.hasAtk||p.hasDmg);
+  const utilPowers=c.powers.filter(p=>!p.hasAtk&&!p.hasDmg);
+  const combatPwrRows=combatPowers.map((p,i)=>{
+    const idx=c.powers.indexOf(p);
+    const atkBtn=p.hasAtk?`<span class="fpwr-atk" onclick="rollPowerAtk('${c.id}',${idx})" title="Roll force attack">${forceAtk}</span>`:"—";
+    const dmgMod=wisMod>=0?"+"+wisMod:String(wisMod);
+    const dmgBtn=p.hasDmg?`<span class="fpwr-dmg" onclick="rollPowerDmg('${c.id}',${idx})" title="Roll damage">${p.dmg}${dmgMod}</span>`:"—";
+    return `<tr><td style="font-weight:500;color:var(--txtb)">${p.n}</td><td>${atkBtn}</td><td>${dmgBtn}</td><td style="font-family:var(--fm);font-size:9px;color:var(--purple)">${p.c}</td><td><span class="pwt">${p.t}</span></td><td><button class="dbtn" onclick="delPower('${c.id}',${idx})">×</button></td></tr>`;
+  }).join("");
+  const utilPwrRows=utilPowers.map((p)=>{
+    const idx=c.powers.indexOf(p);
+    return `<div class="upwr"><div style="flex:1"><div class="pwn">${p.n}</div><div class="pwd">${p.d}</div></div><span class="pwc">${p.c}</span><span class="pwt">${p.t}</span><button class="dbtn" onclick="delPower('${c.id}',${idx})">×</button></div>`;
+  }).join("");
+  const powersHtml=(combatPowers.length?`<table class="fpwr"><thead><tr><th>Power</th><th title="Force attack bonus">Atk ↗</th><th title="Damage + WIS mod">Dmg ↗</th><th>Cost</th><th>Type</th><th></th></tr></thead><tbody>${combatPwrRows}</tbody></table>`:"")+(utilPowers.length?`<div>${utilPwrRows}</div>`:"");
   const wpns=(c.wpns||[]).map((w,i)=>{
     const atk=watkBonus(c,w);
     const abMap2={};Object.entries(c.abs).forEach(([k,[s]])=>{abMap2[k]=mod(s);});
@@ -674,7 +773,7 @@ function renderChar(c){
     const pips=Array.from({length:5},(_,i)=>`<div class="bondp${i<r.b?" on":""}" onclick="setBond('${c.id}',${ri},${i+1})"></div>`).join("");
     return `<div class="relr"><div class="relic">${r.ic}</div><div><div class="reln">${r.n}</div><div class="relro">${r.ro}</div><div class="relnote" onclick="eRelNote('${c.id}',${ri})">${r.note}</div><div class="bondm">${pips}</div></div></div>`;
   }).join("");
-  return `<div class="cl"><aside class="sb"><div class="port">${portHtml}<div class="plbl">${c.lbl}</div></div><div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:var(--txtb);line-height:1.1;cursor:pointer" onclick="editName('${c.id}')" title="Click to edit">${c.name}</div><div style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;cursor:pointer" onclick="editSpecies('${c.id}')" title="Click to edit">${c.species}</div><div style="font-size:13px;color:${c.col};margin-top:5px;font-weight:500;cursor:pointer" onclick="editCls('${c.id}')" title="Click to edit">${c.cls}</div></div><div class="sblk"><div class="blbl">Hit Points</div><div class="hprow"><button class="hpbtn" onclick="aHP('${c.id}',-1)">−</button><div style="display:flex;align-items:baseline;gap:4px;flex:1;justify-content:center"><span class="hpnum" style="color:${hcol}" onclick="sHP('${c.id}')" title="Click to set">${c.hp}</span><span class="hpsep">/</span><span class="hpmax" onclick="editMaxHP('${c.id}')" style="cursor:pointer" title="Click to edit max">${c.hpMax}</span></div><button class="hpbtn" onclick="aHP('${c.id}',1)">+</button></div><div class="tmphp" onclick="sTemp('${c.id}')">${c.hpTemp?"+"+c.hpTemp+" temp HP":"+ Add temp HP"}</div></div><div class="sblk"><div class="blbl">Force Points</div><div style="font-family:var(--fd);font-size:20px;font-weight:700;color:#9b7fe8;line-height:1;margin-bottom:4px">${c.fp} / <span onclick="editMaxFP('${c.id}')" style="cursor:pointer;border-bottom:1px dashed #9b7fe8" title="Click to edit max">${c.fpMax}</span></div><div class="fprow">${fpPips}</div></div><div class="sblk"><div class="blbl">Combat</div><div class="mg"><div class="ms" onclick="editAC('${c.id}')" style="cursor:pointer"><div class="mv">${c.ac}</div><div class="ml">AC</div></div><div class="ms" onclick="editInit('${c.id}')" style="cursor:pointer"><div class="mv">${c.init}</div><div class="ml">Init</div></div><div class="ms" onclick="editSpd('${c.id}')" style="cursor:pointer;grid-column:1/-1"><div class="mv">${c.spd}</div><div class="ml">Speed</div></div></div></div></aside><div class="cm"><div class="sec"><div class="sch"><span class="sct">Ability Scores</span></div><div class="scb"><div class="abg">${abItems}</div></div></div><div class="sec"><div class="sch"><span class="sct">Saves &amp; Skills</span></div><div class="scb"><div class="ssg"><div><div class="blbl" style="margin-bottom:5px">Saving Throws</div>${saves}</div><div><div class="blbl" style="margin-bottom:5px">Skills</div>${skills}</div></div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:4px"></span>Proficient &nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px"></span>Expertise</div></div></div>${c.powers.length?'<div class="sec"><div class="sch"><span class="sct">Force Powers</span></div><div class="scb">'+powers+'</div></div>':"" }<div class="sec"><div class="sch"><span class="sct">Weapons</span><button class="abtn" onclick="addWpn('${c.id}')">+ Add weapon</button></div><div class="scb"><table class="wpn"><thead><tr><th>Name</th><th title="Click to roll attack">Attack ↗</th><th title="Click to roll damage">Damage ↗</th><th>Type</th><th>Range</th><th>Notes</th><th></th></tr></thead><tbody>${wpns||"<tr><td colspan='7' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No weapons.</td></tr>"}</tbody></table></div></div><div class="sec"><div class="sch"><span class="sct">Inventory</span><button class="abtn" onclick="addItem('${c.id}')">+ Add item</button></div><div class="scb"><table class="inv"><thead><tr><th>Item</th><th>Qty</th><th>Wt</th><th>Rarity</th><th>Notes</th><th></th></tr></thead><tbody>${inv||"<tr><td colspan='6' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No items.</td></tr>"}</tbody></table><div class="crrow"><span class="crv" onclick="sCr('${c.id}')" title="Click to edit">${c.credits.toLocaleString()}</span><span class="crl">credits</span></div></div></div><div class="sec"><div class="sch"><span class="sct">Downtime</span><button class="abtn" onclick="addDT('${c.id}')">+ Add entry</button></div><div class="scb">${dt||'<div style="font-size:12px;color:var(--txt3)">No entries yet.</div>'}</div></div><div class="sec"><div class="sch"><span class="sct">Relationships &amp; Bonds</span></div><div class="scb"><div>${rels}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)">Click pips to adjust bond · 3+ = Bond Boon available</div></div></div><div class="sec"><div class="sch"><span class="sct">Notes</span></div><div class="scb"><textarea class="notea" placeholder="Session notes, quest reminders..." oninput="sNotes('${c.id}',this.value)">${c.notes}</textarea><div class="noteh">Saves during this session · private to this browser tab</div></div></div></div></div>`;
+  return `<div class="cl"><aside class="sb"><div class="port">${portHtml}<div class="plbl">${c.lbl}</div></div><div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:var(--txtb);line-height:1.1;cursor:pointer" onclick="editName('${c.id}')" title="Click to edit">${c.name}</div><div style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;cursor:pointer" onclick="editSpecies('${c.id}')" title="Click to edit">${c.species}</div><div style="font-size:13px;color:${c.col};margin-top:5px;font-weight:500;cursor:pointer" onclick="editCls('${c.id}')" title="Click to edit">${c.cls}</div></div><div class="sblk"><div class="blbl">Hit Points</div><div class="hprow"><button class="hpbtn" onclick="aHP('${c.id}',-1)">−</button><div style="display:flex;align-items:baseline;gap:4px;flex:1;justify-content:center"><span class="hpnum" style="color:${hcol}" onclick="sHP('${c.id}')" title="Click to set">${c.hp}</span><span class="hpsep">/</span><span class="hpmax" onclick="editMaxHP('${c.id}')" style="cursor:pointer" title="Click to edit max">${c.hpMax}</span></div><button class="hpbtn" onclick="aHP('${c.id}',1)">+</button></div><div class="tmphp" onclick="sTemp('${c.id}')">${c.hpTemp?"+"+c.hpTemp+" temp HP":"+ Add temp HP"}</div></div><div class="sblk"><div class="blbl">Force Points</div><div style="font-family:var(--fd);font-size:20px;font-weight:700;color:#9b7fe8;line-height:1;margin-bottom:4px">${c.fp} / <span onclick="editMaxFP('${c.id}')" style="cursor:pointer;border-bottom:1px dashed #9b7fe8" title="Click to edit max">${c.fpMax}</span></div><div class="fprow">${fpPips}</div></div><div class="sblk"><div class="blbl">Combat</div><div class="mg"><div class="ms" onclick="editAC('${c.id}')" style="cursor:pointer"><div class="mv">${c.ac}</div><div class="ml">AC</div></div><div class="ms" onclick="editInit('${c.id}')" style="cursor:pointer"><div class="mv">${c.init}</div><div class="ml">Init</div></div><div class="ms" onclick="editSpd('${c.id}')" style="cursor:pointer;grid-column:1/-1"><div class="mv">${c.spd}</div><div class="ml">Speed</div></div></div></div></aside><div class="cm"><div class="sec"><div class="sch"><span class="sct">Ability Scores</span></div><div class="scb"><div class="abg">${abItems}</div></div></div><div class="sec"><div class="sch"><span class="sct">Saves &amp; Skills</span></div><div class="scb"><div class="ssg"><div><div class="blbl" style="margin-bottom:5px">Saving Throws</div>${saves}</div><div><div class="blbl" style="margin-bottom:5px">Skills</div>${skills}</div></div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:4px"></span>Proficient &nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px"></span>Expertise</div></div></div>${c.powers.length?'<div class="sec"><div class="sch"><span class="sct">Force Powers</span><button class=\"abtn\" onclick=\"openPowerPicker(\'${c.id}\')\" >+ Add power</button></div><div class=\"scb\">'+(powersHtml||'<div style=\"font-size:12px;color:var(--txt3)\">No powers yet.</div>')+'</div></div>':"" }<div class="sec"><div class="sch"><span class="sct">Weapons</span><button class="abtn" onclick="addWpn('${c.id}')">+ Add weapon</button></div><div class="scb"><table class="wpn"><thead><tr><th>Name</th><th title="Click to roll attack">Attack ↗</th><th title="Click to roll damage">Damage ↗</th><th>Type</th><th>Range</th><th>Notes</th><th></th></tr></thead><tbody>${wpns||"<tr><td colspan='7' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No weapons.</td></tr>"}</tbody></table></div></div><div class="sec"><div class="sch"><span class="sct">Inventory</span><button class="abtn" onclick="addItem('${c.id}')">+ Add item</button></div><div class="scb"><table class="inv"><thead><tr><th>Item</th><th>Qty</th><th>Wt</th><th>Rarity</th><th>Notes</th><th></th></tr></thead><tbody>${inv||"<tr><td colspan='6' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No items.</td></tr>"}</tbody></table><div class="crrow"><span class="crv" onclick="sCr('${c.id}')" title="Click to edit">${c.credits.toLocaleString()}</span><span class="crl">credits</span></div></div></div><div class="sec"><div class="sch"><span class="sct">Downtime</span><button class="abtn" onclick="addDT('${c.id}')">+ Add entry</button></div><div class="scb">${dt||'<div style="font-size:12px;color:var(--txt3)">No entries yet.</div>'}</div></div><div class="sec"><div class="sch"><span class="sct">Relationships &amp; Bonds</span></div><div class="scb"><div>${rels}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)">Click pips to adjust bond · 3+ = Bond Boon available</div></div></div><div class="sec"><div class="sch"><span class="sct">Notes</span></div><div class="scb"><textarea class="notea" placeholder="Session notes, quest reminders..." oninput="sNotes('${c.id}',this.value)">${c.notes}</textarea><div class="noteh">Saves during this session · private to this browser tab</div></div></div></div></div>`;
 }
 function rollWpnDmg(id,idx){
   const c=gc(id);const w=c.wpns[idx];
@@ -1076,10 +1175,11 @@ function openCodexModal(type,id){
   document.getElementById("cdxModalTitle").textContent=entry.name;
   let html="";
 
-  if(type==="npcs"){
+  if(type==="npcs"||type==="villains"){
     html+=cdxPortrait(entry,"👤");
     html+=`<div class="cdx-modal-body">`;
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Affiliation</div><div class="cdx-modal-val">${entry.affiliation}</div></div>`;
+    if(entry.threat)html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Threat Level</div><div class="cdx-modal-val"><span class="cdx-badge threat-${entry.threat}">${entry.threat} threat</span></div></div>`;
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Status</div><div class="cdx-modal-val">${cdxStatusBadge(entry.status)}</div></div>`;
     // Location
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Last Known Location</div><div class="cdx-modal-val">${entry.location}</div></div>`;
@@ -1136,9 +1236,14 @@ async function loadCodex(){
   if(codexLoaded)return;
   if(window.fbGetCodex){
     const data=await window.fbGetCodex();
-    if(data){codexData=data;codexLoaded=true;return;}
+    if(data){
+      codexData=data;
+      if(!codexData.villains)codexData.villains=JSON.parse(JSON.stringify(VILLAIN_DEFAULTS));
+      codexLoaded=true;return;
+    }
   }
   codexData=JSON.parse(JSON.stringify(CODEX_DEFAULTS));
+  codexData.villains=JSON.parse(JSON.stringify(VILLAIN_DEFAULTS));
   codexLoaded=true;
 }
 
@@ -1155,14 +1260,19 @@ function addCodexEntry(type){
   if(!window.requireDM())return;
   const name=prompt("Name:");if(!name)return;
   const entry={id:type+Date.now(),name,hidden:false};
-  if(type==="npcs"){
+  if(type==="npcs"||type==="villains"){
     entry.affiliation=prompt("Affiliation:","")||"";
     entry.status=prompt("Status (alive/missing/dead/unknown):","alive")||"alive";
+    if(type==="villains")entry.threat=prompt("Threat level (low/moderate/high/critical):","moderate")||"moderate";
     entry.location=prompt("Last known location:","")||"Unknown";
     entry.portrait="";
     entry.description=prompt("Description:","")||"";
+    entry.descriptionSecret="";entry.descriptionRevealed=false;
     entry.history=prompt("History:","")||"";
+    entry.historySecret="";entry.historyRevealed=false;
     entry.rels=prompt("Relationships:","")||"";
+    entry.relsSecret="";entry.relsRevealed=false;
+    entry.locationSecret="";entry.locationRevealed=false;
   }else if(type==="planets"){
     entry.region=prompt("Region:","")||"";
     entry.control=prompt("Imperial control (none/partial/occupied/lockdown):","none")||"none";
@@ -1218,28 +1328,32 @@ function renderCodex(){
   });
 
   let cards="";
-  if(codexTab==="npcs"){
+  if(codexTab==="npcs"||codexTab==="villains"){
+    const type=codexTab;
     cards=filtered.map(e=>{
+      const statusBadge=isDM
+        ?`<span class="cdx-badge ${({alive:"st-alive",missing:"st-missing",dead:"st-dead",unknown:"st-unknown"})[e.status||"alive"]} status-toggle" onclick="event.stopPropagation();toggleNPCStatus('${type}','${e.id}')" title="Click to change status">${e.status||"alive"}</span>`
+        :cdxStatusBadge(e.status||"alive");
+      const threatBadge=e.threat?`<span class="cdx-badge threat-${e.threat}">${e.threat} threat</span>`:"";
       const body=e.hidden&&!isDM?
         `<div class="cdx-redacted"><span class="cdx-redacted-txt">⬛ CLASSIFIED — DM EYES ONLY</span></div>`:
         `<div class="cdx-card-body">
           ${e.portrait?`<img src="${e.portrait}" style="width:100%;height:140px;object-fit:cover;object-position:top;border-radius:2px;margin-bottom:.65rem">` :""}
           <div class="cdx-field"><div class="cdx-field-lbl">Affiliation</div><div class="cdx-field-val">${e.affiliation}</div></div>
+          ${e.threat?`<div class="cdx-field"><div class="cdx-field-lbl">Threat Level</div><div class="cdx-field-val">${threatBadge}</div></div>`:""}
           <div class="cdx-field"><div class="cdx-field-lbl">Last Known Location</div><div class="cdx-field-val">${e.location}</div></div>
           <div class="cdx-field"><div class="cdx-field-lbl">Description</div><div class="cdx-field-val">${e.description}</div></div>
-          <div class="cdx-field"><div class="cdx-field-lbl">History</div><div class="cdx-field-val">${e.history}</div></div>
-          ${e.rels?`<div class="cdx-field"><div class="cdx-field-lbl">Relationships</div><div class="cdx-field-val">${e.rels}</div></div>`:""}
           ${isDM?`<div class="cdx-actions">
-            <button class="abtn" onclick="editCodexEntry('npcs','${e.id}')">Edit</button>
-            <button class="abtn" onclick="toggleHidden('npcs','${e.id}')">${e.hidden?"Reveal":"Hide"}</button>
-            <button class="abtn" style="color:var(--red)" onclick="deleteCodexEntry('npcs','${e.id}')">Delete</button>
+            <button class="abtn" onclick="editCodexEntry('${type}','${e.id}')">Edit</button>
+            <button class="abtn" onclick="toggleHidden('${type}','${e.id}')">${e.hidden?"Reveal":"Hide"}</button>
+            <button class="abtn" style="color:var(--red)" onclick="deleteCodexEntry('${type}','${e.id}')">Delete</button>
           </div>`:""}
         </div>`;
-      return `<div class="cdx-card${e.hidden?" hidden-entry":""}" style="cursor:pointer" onclick="openCodexModal('npcs','${e.id}')">
+      return `<div class="cdx-card${e.hidden?" hidden-entry":""}" style="cursor:pointer" onclick="openCodexModal('${type}','${e.id}')">
         <div class="cdx-card-hdr">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span class="cdx-card-title">${e.name}</span>
-            ${cdxStatusBadge(e.status)}
+            ${statusBadge}
             ${e.hidden?`<span class="cdx-badge st-unknown">Hidden</span>`:""}
           </div>
         </div>${body}</div>`;
@@ -1300,6 +1414,7 @@ function renderCodex(){
         <button class="cdx-tab${codexTab==="npcs"?" active":""}" onclick="codexTab='npcs';render()">NPCs</button>
         <button class="cdx-tab${codexTab==="planets"?" active":""}" onclick="codexTab='planets';render()">Planets</button>
         <button class="cdx-tab${codexTab==="orgs"?" active":""}" onclick="codexTab='orgs';render()">Organizations</button>
+        <button class="cdx-tab${codexTab==="villains"?" active":""}" onclick="codexTab='villains';render()">Villains</button>
       </div>
       ${isDM?`<button class="abtn" onclick="addCodexEntry('${codexTab}')">+ Add entry</button>`:""}
     </div>
@@ -1307,7 +1422,208 @@ function renderCodex(){
   </div>`;
 }
 
-// Init codex on first load
+// ── Force Power Picker ────────────────────────────────────────────────────
+let sw5ePowers=[];
+let ppkrFilter="all";
+let ppkrCharId=null;
+let ppkrSelected=null;
+
+async function fetchSW5ePowers(){
+  if(sw5ePowers.length)return;
+  try{
+    const r=await fetch("https://raw.githubusercontent.com/sw5e-org/sw5e/master/data/ForcePower.json");
+    const data=await r.json();
+    sw5ePowers=data.filter(p=>p.name).map(p=>({
+      n:p.name,
+      t:(p.powerType||p.school||"Universal"),
+      c:p.level!==undefined?(p.level===0?"At-will":p.level+" FP"):"1 FP",
+      d:p.description||p.desc||"",
+      level:p.level||0
+    }));
+    sw5ePowers.sort((a,b)=>a.level-b.level||a.n.localeCompare(b.n));
+  }catch(e){
+    console.warn("SW5e fetch failed:",e);
+    sw5ePowers=[{n:"Force Push/Pull",t:"Universal",c:"1 FP",d:"Move a creature or object up to 30 ft.",level:1},{n:"Saber Ward",t:"Light",c:"1 FP",d:"+2 AC until end of your next turn.",level:1},{n:"Battle Meditation",t:"Light",c:"2 FP",d:"Allies within 30 ft. gain advantage on one attack roll.",level:2},{n:"Force Camouflage",t:"Universal",c:"2 FP",d:"Invisible until you attack or cast a power.",level:2},{n:"Affect Mind",t:"Light",c:"1 FP",d:"DC WIS save or creature is charmed for 1 minute.",level:1},{n:"Telekinesis",t:"Universal",c:"2 FP",d:"Move objects or creatures. Concentration, 10 minutes.",level:2},{n:"Heal",t:"Light",c:"1-3 FP",d:"Restore 1d8 HP per FP. Touch range.",level:1},{n:"Force Lightning",t:"Dark",c:"2 FP",d:"2d6 lightning damage, DEX save for half.",level:2},{n:"Force Choke",t:"Dark",c:"2 FP",d:"Restrain and deal 1d6 kinetic damage per round.",level:2},{n:"Stun",t:"Universal",c:"2 FP",d:"CON save or stunned until end of next turn.",level:2}];
+  }
+  filterPowers();
+}
+
+function openPowerPicker(charId){
+  if(!window.requireAuth())return;
+  ppkrCharId=charId;
+  ppkrSelected=null;
+  ppkrFilter="all";
+  document.getElementById("ppkrModal").classList.add("open");
+  document.getElementById("ppkrSearch").value="";
+  document.getElementById("ppkrCombat").style.display="none";
+  document.getElementById("ppkrHasAtk").checked=false;
+  document.getElementById("ppkrHasDmg").checked=false;
+  document.getElementById("ppkrDmgInput").style.display="none";
+  document.querySelectorAll(".ppkr-filter").forEach(b=>b.classList.remove("active"));
+  document.getElementById("pf-all").classList.add("active");
+  document.body.style.overflow="hidden";
+  if(!sw5ePowers.length) fetchSW5ePowers();
+  else filterPowers();
+}
+
+function closePowerPicker(){
+  document.getElementById("ppkrModal").classList.remove("open");
+  document.body.style.overflow="";
+}
+
+function setPowerFilter(f){
+  ppkrFilter=f;
+  document.querySelectorAll(".ppkr-filter").forEach(b=>b.classList.remove("active"));
+  document.getElementById("pf-"+f).classList.add("active");
+  filterPowers();
+}
+
+function filterPowers(){
+  const q=(document.getElementById("ppkrSearch")?.value||"").toLowerCase();
+  const list=document.getElementById("ppkrList");
+  if(!list)return;
+  if(!sw5ePowers.length){list.innerHTML='<div class="ppkr-loading">LOADING...</div>';return;}
+  const filtered=sw5ePowers.filter(p=>{
+    const typeMatch=ppkrFilter==="all"||p.t.toLowerCase().includes(ppkrFilter);
+    const searchMatch=!q||p.n.toLowerCase().includes(q)||p.d.toLowerCase().includes(q);
+    return typeMatch&&searchMatch;
+  }).slice(0,50);
+  if(!filtered.length){list.innerHTML='<div class="ppkr-loading">No powers found.</div>';return;}
+  const typeColor={universal:"color:var(--blue)",light:"color:var(--green)",dark:"color:var(--red)"};
+  list.innerHTML=filtered.map(p=>`
+    <div class="ppkr-item" onclick="selectPower(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+      <div class="ppkr-item-name">${p.n}</div>
+      <div class="ppkr-item-meta">
+        <span class="pwt" style="${typeColor[p.t.toLowerCase()]||''};border-color:currentColor">${p.t}</span>
+        <span style="font-family:var(--fm);font-size:10px;color:var(--purple)">${p.c}</span>
+      </div>
+      <div class="ppkr-item-desc">${p.d.slice(0,120)}${p.d.length>120?"...":""}</div>
+    </div>`).join("");
+}
+
+function selectPower(p){
+  ppkrSelected=p;
+  document.getElementById("ppkrSelectedName").textContent=p.n;
+  document.getElementById("ppkrCombat").style.display="block";
+  document.getElementById("ppkrHasAtk").checked=false;
+  document.getElementById("ppkrHasDmg").checked=false;
+  document.getElementById("ppkrDmgInput").style.display="none";
+  // Scroll combat section into view
+  document.getElementById("ppkrCombat").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function toggleDmgInput(){
+  const has=document.getElementById("ppkrHasDmg").checked;
+  document.getElementById("ppkrDmgInput").style.display=has?"flex":"none";
+}
+
+function confirmAddPower(){
+  if(!ppkrSelected||!ppkrCharId)return;
+  const hasAtk=document.getElementById("ppkrHasAtk").checked;
+  const hasDmg=document.getElementById("ppkrHasDmg").checked;
+  const dmgDice=document.getElementById("ppkrDmgDice").value||"1d6";
+  const dmgType=document.getElementById("ppkrDmgType").value||"Energy";
+  const power={
+    n:ppkrSelected.n,
+    c:ppkrSelected.c,
+    t:ppkrSelected.t,
+    d:ppkrSelected.d,
+    hasAtk:hasAtk?1:0,
+    hasDmg:hasDmg?1:0,
+    dmg:hasDmg?dmgDice:"",
+    dtype:hasDmg?dmgType:""
+  };
+  upd(ppkrCharId,c=>{c.powers.push(power);});
+  closePowerPicker();
+}
+
+window.openPowerPicker=openPowerPicker;
+window.closePowerPicker=closePowerPicker;
+window.setPowerFilter=setPowerFilter;
+window.filterPowers=filterPowers;
+window.selectPower=selectPower;
+window.toggleDmgInput=toggleDmgInput;
+window.confirmAddPower=confirmAddPower;
+
+// ── Force power attack/damage rolls ──────────────────────────────────────
+function rollPowerAtk(id,idx){
+  const c=gc(id);const p=c.powers[idx];
+  const wisMod=mod(c.abs.WIS[0]);
+  const atkMod=wisMod+PROF;
+  const modStr=atkMod>=0?"+"+atkMod:String(atkMod);
+  const adv=diceState.adv;
+  let r1=Math.ceil(Math.random()*20);
+  let r2=Math.ceil(Math.random()*20);
+  let chosen,breakdown;
+  if(adv==="adv"){chosen=Math.max(r1,r2);breakdown="Adv: ["+r1+", "+r2+"] → "+chosen;}
+  else if(adv==="dis"){chosen=Math.min(r1,r2);breakdown="Dis: ["+r1+", "+r2+"] → "+chosen;}
+  else{chosen=r1;breakdown="d20: "+r1;}
+  const total=chosen+atkMod;
+  const isCrit=chosen===20;const isFail=chosen===1;
+  const panel=document.getElementById("dice-panel");if(panel)panel.classList.add("open");
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  const d20el=document.getElementById("die20");if(d20el)d20el.classList.add("active");
+  diceState.die=20;diceState.count=1;
+  document.getElementById("dicecount").textContent=1;
+  document.getElementById("advrow").style.display="flex";
+  const res=document.getElementById("dpresult");const tot=document.getElementById("dptotal");const brk=document.getElementById("dpbreak");const lbl=document.getElementById("dplabel");
+  if(res&&tot&&brk&&lbl){
+    res.classList.add("show");tot.textContent=total;
+    tot.className="dp-total"+(isCrit?" crit":isFail?" fail":"");
+    brk.textContent=breakdown+" "+modStr+" = "+total;
+    lbl.textContent=p.n+" attack"+(isCrit?" — CRITICAL HIT!":isFail?" — CRITICAL FAIL":"");
+    rollHistory.unshift({label:p.n+" atk",total,isCrit,isFail,breakdown:breakdown+modStr});
+    if(rollHistory.length>10)rollHistory.pop();renderHistory();
+  }
+}
+
+function rollPowerDmg(id,idx){
+  const c=gc(id);const p=c.powers[idx];
+  const wisMod=mod(c.abs.WIS[0]);
+  const [num,die]=p.dmg.split("d").map(Number);
+  let total=0;const rolls=[];
+  for(let i=0;i<num;i++){const r=Math.ceil(Math.random()*die);rolls.push(r);total+=r;}
+  const dmgTotal=total+wisMod;
+  const modStr=wisMod>=0?"+"+wisMod:String(wisMod);
+  const panel=document.getElementById("dice-panel");if(panel)panel.classList.add("open");
+  document.querySelectorAll(".dp-die").forEach(d=>d.classList.remove("active"));
+  const dieEl=document.getElementById("die"+die);if(dieEl)dieEl.classList.add("active");
+  diceState.die=die;diceState.count=num;
+  document.getElementById("dicecount").textContent=num;
+  const res=document.getElementById("dpresult");const tot=document.getElementById("dptotal");const brk=document.getElementById("dpbreak");const lbl=document.getElementById("dplabel");
+  if(res&&tot&&brk&&lbl){
+    res.classList.add("show");tot.textContent=dmgTotal;tot.className="dp-total";
+    brk.textContent=rolls.join(" + ")+modStr+" = "+dmgTotal;
+    lbl.textContent=p.n+" · "+p.dmg+modStr+" "+p.dtype;
+    rollHistory.unshift({label:p.n+" dmg",total:dmgTotal,isCrit:false,isFail:false,breakdown:rolls.join("+")+modStr});
+    if(rollHistory.length>10)rollHistory.pop();renderHistory();
+  }
+}
+
+window.rollPowerAtk=rollPowerAtk;
+window.rollPowerDmg=rollPowerDmg;
+
+// ── Status toggle ─────────────────────────────────────────────────────────
+function toggleNPCStatus(type,id){
+  if(!window.requireDM())return;
+  const entry=codexData[type].find(e=>e.id===id);if(!entry)return;
+  const cycle=["alive","missing","dead","unknown"];
+  const idx=cycle.indexOf(entry.status||"alive");
+  entry.status=cycle[(idx+1)%cycle.length];
+  saveCodex();
+  render();
+}
+window.toggleNPCStatus=toggleNPCStatus;
+
+// ── Villains tab data ─────────────────────────────────────────────────────
+const VILLAIN_DEFAULTS=[
+  {id:"vil1",name:"The Seventh Sister",affiliation:"Imperial Inquisitorius",status:"alive",threat:"high",portrait:"",hidden:false,
+   location:"Sector Command — Mobile",locationSecret:"Currently assigned to the Kathari Expanse specifically. Her orders came from Vader directly after the Prison Barge operation.",locationRevealed:false,
+   description:"An Imperial Inquisitor. Double-bladed crimson lightsaber. Presence confirmed during the Prison Barge X-103 operation. Cold, precise, and patient in a way that makes her more dangerous than the ones who rage.",descriptionSecret:"She was a Jedi Padawan before Order 66. Her master died protecting her. The Empire found her three months later. Whatever they did to turn her took less time than it should have.",descriptionRevealed:false,
+   history:"Confirmed active in the sector. Her assignment predates the party's involvement — she was already hunting Force-sensitives in the Kathari Expanse before the Prison Barge incident brought her into direct contact with the cell.",historySecret:"She has a file on the Vossar Jedi Order that predates the party's involvement by two years. Someone fed the Inquisitorius information about Vossar from the inside. She knows more than she should.",historyRevealed:false,
+   rels:"Answers to Darth Vader. Operating independently of local Moff authority — a fact that creates friction with Imperial command in the sector.",relsSecret:"She has identified at least one of the party as Force-sensitive. She is not rushing. She is building a complete picture before she moves.",relsRevealed:false}
+];
+
 loadCodex().then(()=>render());
 
 // Init adv row visibility
@@ -1325,7 +1641,13 @@ window.editMaxHP=editMaxHP;window.editMaxFP=editMaxFP;
 window.editName=editName;window.editSpecies=editSpecies;window.editCls=editCls;
 window.aHP=aHP;window.sHP=sHP;window.sTemp=sTemp;window.tFP=tFP;
 window.sCr=sCr;window.addItem=addItem;window.delItem=delItem;
+function delPower(id,idx){
+  if(!window.requireAuth())return;
+  if(!confirm("Remove this power?"))return;
+  upd(id,c=>{c.powers.splice(idx,1);});
+}
 window.addWpn=addWpn;window.delWpn=delWpn;window.rollWpnDmg=rollWpnDmg;window.rollWpnAtk=rollWpnAtk;
+window.delPower=delPower;
 window.addDT=addDT;window.dDT=dDT;window.eDT=eDT;window.cDT=cDT;
 window.setBond=setBond;window.eRelNote=eRelNote;window.sNotes=sNotes;
 window.addCodexEntry=addCodexEntry;window.editCodexEntry=editCodexEntry;
