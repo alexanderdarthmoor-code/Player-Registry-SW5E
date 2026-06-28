@@ -280,6 +280,10 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .fpc-type-l{font-family:var(--fm);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--green);border:1px solid rgba(61,186,126,.35);border-radius:2px;padding:2px 5px}
 .fpc-type-d{font-family:var(--fm);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--red);border:1px solid rgba(212,91,91,.35);border-radius:2px;padding:2px 5px}
 .fpc-cost{font-family:var(--fm);font-size:10px;color:var(--purple)}
+.fpc-use{font-family:var(--fm);font-size:10px;letter-spacing:.04em;color:var(--purple);cursor:pointer;padding:2px 7px;border-radius:2px;border:1px solid rgba(155,127,232,.35);background:rgba(155,127,232,.08);white-space:nowrap;transition:background .15s,color .15s;user-select:none}
+.fpc-use:hover{background:var(--purple);color:#fff;border-color:var(--purple)}
+.fpc-use-free{color:var(--txt3);border-color:var(--bdr2);background:transparent}
+.fpc-use-free:hover{background:var(--s2);color:var(--txt);border-color:var(--bdr2)}
 .pwr:last-child{border-bottom:none}
 .pwn{font-size:13px;font-weight:500;color:var(--txtb)}
 .pwd{font-size:11px;color:var(--txt2);margin-top:2px;line-height:1.4}
@@ -928,7 +932,9 @@ function renderChar(c){
     const dmgMod=wisMod>=0?"+"+wisMod:String(wisMod);
     const atkBtn=p.hasAtk?`<span class="fpwr-atk" onclick="rollPowerAtk('${c.id}',${idx})" title="Roll force attack">${forceAtk}</span>`:"";
     const dmgBtn=p.hasDmg?`<span class="fpwr-dmg" onclick="rollPowerDmg('${c.id}',${idx})" title="Roll damage">${p.dmg}${dmgMod}</span>`:"";
-    return `<div class="fpc"><div class="fpc-name">${p.n}</div><div class="fpc-actions">${atkBtn}${dmgBtn}<button class="dbtn" onclick="delPower('${c.id}',${idx})">×</button></div><div class="fpc-meta"><span class="${tc}">${p.t}</span><span class="fpc-cost">${p.c}</span></div><div class="fpc-desc">${p.d}</div></div>`;
+    const isAtWill=(p.c||"").toLowerCase()==="at-will";
+    const useBtn=`<span class="fpc-use${isAtWill?" fpc-use-free":""}" onclick="usePower('${c.id}',${idx})" title="${isAtWill?"At-will — no FP cost":"Spend "+p.c}" >${isAtWill?"✦":"▶ "+p.c}</span>`;
+    return `<div class="fpc"><div class="fpc-name">${p.n}</div><div class="fpc-actions">${useBtn}${atkBtn}${dmgBtn}<button class="dbtn" onclick="delPower('${c.id}',${idx})">×</button></div><div class="fpc-meta"><span class="${tc}">${p.t}</span></div><div class="fpc-desc">${p.d}</div></div>`;
   }).join("")+'</div>';
   const wpns=(c.wpns||[]).map((w,i)=>{
     const atk=watkBonus(c,w);
@@ -1647,23 +1653,111 @@ let ppkrFilter="all";
 let ppkrCharId=null;
 let ppkrSelected=null;
 
+// Full SW5e PHB Force Powers — used as fallback and primary source
+const SW5E_POWERS_FALLBACK=[
+  // ── At-will ──
+  {n:"Burst",t:"Universal",c:"At-will",d:"Each creature in a 5-foot-radius sphere centered on a point you choose must succeed on a Dexterity saving throw or take 1d6 kinetic damage. The power's damage increases by 1d6 when you reach 5th level (2d6), 11th level (3d6), and 17th level (4d6).",level:0},
+  {n:"Force Disarm",t:"Universal",c:"At-will",d:"You attempt to disarm a creature of a weapon or another object it's holding. Make a force attack roll contested by the target's Strength (Athletics) or Dexterity (Acrobatics) check. On a hit, you send the object flying up to 10 feet away from the target.",level:0},
+  {n:"Force Technique",t:"Universal",c:"At-will",d:"You manipulate the force to perform minor tricks. Choose from: an instantaneous harmless sensory effect, light a candle or snuff a flame, clean or soil an object, chill/warm/flavor 1 pound of nonliving material, make a color or mark appear on an object, or create a small mundane item.",level:0},
+  {n:"Give Life",t:"Light",c:"At-will",d:"A creature you touch regains 1 hit point. This power has no effect on undead or constructs.",level:0},
+  {n:"Mind Trick",t:"Universal",c:"At-will",d:"You attempt to influence a humanoid you can see within range. The target must make a Wisdom saving throw or be charmed by you for 1 hour. The charmed creature regards you as a friendly acquaintance.",level:0},
+  {n:"Saber Reflect",t:"Universal",c:"At-will",d:"You raise your weapon to deflect incoming fire. Until the start of your next turn, you gain a +2 bonus to AC against ranged attacks. If you deflect a ranged attack while wielding a lightsaber, you may redirect it at a target within 20 feet (Dexterity saving throw or 1d6 energy damage).",level:0},
+  {n:"Saber Throw",t:"Universal",c:"At-will",d:"You throw your lightsaber at a target within 30 feet, making a ranged force attack. On a hit, the target takes 1d6 + your forcecasting ability modifier energy damage, then the saber returns to your hand.",level:0},
+  {n:"Turbulence",t:"Universal",c:"At-will",d:"You create a momentary disturbance in the Force around a creature you can see within range. The target must make a Strength saving throw or be pushed 5 feet in a direction of your choice.",level:0},
+  // ── 1st level ──
+  {n:"Absorb Energy",t:"Universal",c:"1 FP",d:"When you take acid, cold, fire, lightning, or thunder damage, you can use your reaction to cast this power. You gain resistance to the triggering damage type until the start of your next turn and the next attack you make deals an extra 1d6 damage of that type.",level:1},
+  {n:"Affect Mind",t:"Light",c:"1 FP",d:"You attempt to cloud the mind of a humanoid you can see. It makes a Wisdom saving throw. On a failure, it is charmed for 1 minute. While charmed, you have a telepathic link to it. On each of your turns you can issue it a suggestion (Wisdom save to resist).",level:1},
+  {n:"Battle Precognition",t:"Universal",c:"1 FP",d:"Your connection to the Force warns you of imminent danger. You gain a +2 bonus to AC and Dexterity saving throws for 10 minutes.",level:1},
+  {n:"Cloud Mind",t:"Dark",c:"1 FP",d:"You cloud the mind of one creature you can see, making it lose track of your presence. The target must make a Wisdom saving throw. On a failure, it can't see or hear you for 1 minute, and you are invisible to it.",level:1},
+  {n:"Comprehend Speech",t:"Universal",c:"1 FP",d:"For the duration of 1 hour, you understand the literal meaning of any spoken language that you hear, and any creature that can hear you understands what you say, provided you both share a language or this power bridges the gap.",level:1},
+  {n:"Force Barrier",t:"Light",c:"1 FP",d:"A shimmering field appears around you. You gain temporary hit points equal to 1d8 + your forcecasting modifier. While these hit points last, you have a +2 bonus to your Armor Class. The power ends when the temporary hit points are depleted.",level:1},
+  {n:"Force Jump",t:"Universal",c:"1 FP",d:"You leap with supernatural Force-enhanced agility. You jump up to 30 feet vertically or 60 feet horizontally without a running start. The power doesn't have any effect if your speed is 0.",level:1},
+  {n:"Force Propel",t:"Universal",c:"1 FP",d:"You hurl an object or creature weighing up to 300 pounds at a target within range. The target must make a Dexterity saving throw. On a failed save, it takes 3d6 kinetic damage and is knocked prone. On a successful save, it takes half damage and isn't knocked prone.",level:1},
+  {n:"Force Push / Pull",t:"Universal",c:"1 FP",d:"You exert a burst of Force energy. A Large or smaller creature within 30 feet must make a Strength saving throw. On a failure, the target takes 2d6 kinetic damage and is pushed up to 15 feet away from you (or pulled 15 feet toward you).",level:1},
+  {n:"Force Sight",t:"Universal",c:"1 FP",d:"You open your awareness to the Force. For 1 minute, you can see invisible creatures and objects, see into the Ethereal Plane, and discern the emotional state of any sentient creature you can see.",level:1},
+  {n:"Heal",t:"Light",c:"1–9 FP",d:"A creature you touch regains hit points equal to 1d8 + your forcecasting ability modifier per force point spent (minimum 1 FP). This power has no effect on constructs or undead.",level:1},
+  {n:"Saber Ward",t:"Universal",c:"1 FP",d:"You raise your lightsaber in a defensive stance. Until the end of your next turn, you have resistance to bludgeoning, piercing, and slashing damage dealt by weapon attacks, and you gain a +2 bonus to your Armor Class.",level:1},
+  {n:"Sanctify",t:"Light",c:"1 FP",d:"You channel the light side of the Force into up to four creatures you can see within range, potentially curing one disease or one condition afflicting each target: blinded, deafened, paralyzed, or poisoned.",level:1},
+  {n:"Sense Force",t:"Universal",c:"1 FP",d:"For the duration of 10 minutes, you sense the presence of the Force within 30 feet. You sense the direction to any Force-sensitive creature, Force nexus, or Force-imbued object within range. You also gain advantage on Wisdom (Insight) checks.",level:1},
+  {n:"Slow Descent",t:"Universal",c:"1 FP",d:"Choose up to five falling creatures within range. A falling creature's rate of descent slows to 60 feet per round until the power ends. If the creature lands before the power ends, it takes no falling damage and can land on its feet.",level:1},
+  {n:"Stun",t:"Universal",c:"1 FP",d:"You emit a burst of Force energy at a creature within range. The target must succeed on a Constitution saving throw or be stunned until the end of your next turn.",level:1},
+  {n:"Tremor Sense",t:"Universal",c:"1 FP",d:"You gain tremorsense out to a range of 60 feet for 1 minute. You can detect and pinpoint the origin of vibrations within range, provided the target is in contact with the ground.",level:1},
+  // ── 2nd level ──
+  {n:"Animate Weapon",t:"Universal",c:"2 FP",d:"Your weapon leaps from your hand and attacks at your direction. It uses your force attack bonus. On each of your turns, as a bonus action, you can move the weapon up to 20 feet and repeat the attack. It returns to your hand when the power ends (1 minute).",level:2},
+  {n:"Battle Meditation",t:"Light",c:"2 FP",d:"You guide your allies through the Force. Choose up to three creatures you can see within 60 feet. Each target gains advantage on the next attack roll, ability check, or saving throw it makes before the start of your next turn.",level:2},
+  {n:"Darkness",t:"Dark",c:"2 FP",d:"Darkness spreads from a point you choose within range, filling a 15-foot-radius sphere for 10 minutes. Darkvision can't penetrate this darkness, and no light spell or power of 2nd level or lower can illuminate it.",level:2},
+  {n:"Force Camouflage",t:"Universal",c:"2 FP",d:"You become invisible for 1 hour. Anything you wear or carry is invisible with you. The power ends if you attack or cast another power.",level:2},
+  {n:"Force Confusion",t:"Dark",c:"2 FP",d:"You reach into the mind of one creature you can see and force it to behave erratically. The target must succeed on a Wisdom saving throw or be confused for 1 minute. On each of its turns, the confused creature must make a Wisdom save or take a random action.",level:2},
+  {n:"Force Enlightenment",t:"Light",c:"2 FP",d:"You grant a willing creature you touch the ability to see its current situation with perfect clarity. For 1 hour, the target has advantage on Wisdom checks and can't be surprised. It also gains advantage on saving throws against being frightened.",level:2},
+  {n:"Force Lightning",t:"Dark",c:"2 FP",d:"A stroke of lightning forming a line 100 feet long and 5 feet wide blasts out from you in a direction you choose. Each creature in the line must make a Dexterity saving throw. A creature takes 4d6 lightning damage on a failed save, or half as much on a successful one.",level:2},
+  {n:"Force Mend",t:"Light",c:"2 FP",d:"You channel the Force to mend a wounded creature's body. The target regains a number of hit points equal to 2d8 + your forcecasting ability modifier. If you use this power over a long rest, the target also regains one spent Hit Die.",level:2},
+  {n:"Force Suppression",t:"Universal",c:"2 FP",d:"Choose one creature, object, or magical effect within range. Any power of 2nd level or lower on the target ends. For each power of 3rd level or higher, make an ability check using your forcecasting ability. The DC equals 10 + the power's level.",level:2},
+  {n:"Force Whisper",t:"Universal",c:"2 FP",d:"You speak a telepathic message to a creature within 30 feet that only it can hear. The creature can respond to you telepathically for the duration of 1 minute.",level:2},
+  {n:"Phasestrike",t:"Universal",c:"2 FP",d:"You phase yourself partly out of reality. Until the start of your next turn, if you hit a creature with a weapon attack, the attack deals an extra 3d6 force damage, and the creature must succeed on a Constitution saving throw or have disadvantage on attack rolls until the end of its next turn.",level:2},
+  {n:"Sever Force",t:"Universal",c:"2 FP",d:"Choose a creature you can see within range. For 1 minute, the creature can't cast force powers, and it loses any benefits from its forcecasting features. It also makes Constitution saving throws to maintain concentration at disadvantage.",level:2},
+  {n:"Telekinesis",t:"Universal",c:"2 FP",d:"You move an object or creature of your choice that you can see within range. The target must be no larger than Large. Move it up to 30 feet in any direction (including upward). A creature must make a Strength saving throw to resist. Concentration, up to 10 minutes.",level:2},
+  // ── 3rd level ──
+  {n:"Choke",t:"Dark",c:"3 FP",d:"You channel dark side energy to crush the throat of a creature within 60 feet. The target must make a Constitution saving throw or be restrained and take 4d6 kinetic damage at the start of each of its turns. It can repeat the save at the end of each turn.",level:3},
+  {n:"Force Blind / Deaf",t:"Universal",c:"3 FP",d:"You overwhelm the senses of a creature within range. The target must make a Constitution saving throw or be blinded or deafened (your choice) for 1 minute. It can repeat the save at the end of each of its turns.",level:3},
+  {n:"Force Drain",t:"Dark",c:"3 FP",d:"Dark side energy drains the life from a creature within 60 feet. The target must make a Constitution saving throw, taking 5d6 necrotic damage on a failed save, or half as much on a successful one. You regain hit points equal to half the damage dealt.",level:3},
+  {n:"Force Immunity",t:"Light",c:"3 FP",d:"Until the power ends, one willing creature you touch is immune to force damage and has advantage on saving throws against force powers. Duration: 1 hour.",level:3},
+  {n:"Force Scream",t:"Dark",c:"3 FP",d:"You emit a Force-enhanced scream. Each creature within 30 feet of you that can hear you must make a Constitution saving throw, taking 3d8 thunder damage and being deafened for 1 minute on a failed save, or half damage and not deafened on a successful one.",level:3},
+  {n:"Foresight",t:"Universal",c:"3–9 FP",d:"You channel the Force to gain brief glimpses of the future. For the duration of 8 hours, you can't be surprised and you have advantage on attack rolls, ability checks, and saving throws. Other creatures have disadvantage on attack rolls against you.",level:3},
+  {n:"Greater Heal",t:"Light",c:"3 FP",d:"A surge of healing energy washes over a creature you touch, causing it to regain 3d8 + your forcecasting modifier hit points and ending any diseases or conditions blinding, deafening, paralysing, or poisoning it.",level:3},
+  {n:"Sever Sense",t:"Universal",c:"3 FP",d:"You cut a creature off from one of its senses. The target must make a Wisdom saving throw or lose one sense (sight, hearing, smell, or touch) of your choice for 1 minute. It repeats the saving throw at the end of each of its turns.",level:3},
+  {n:"Slow",t:"Universal",c:"3 FP",d:"You alter time around up to six creatures of your choice within a 40-foot cube. Each target must succeed on a Wisdom saving throw or be affected for 1 minute. An affected creature's speed is halved, it takes a −2 penalty to AC and Dexterity saves, and it can use an action or bonus action, not both.",level:3},
+  {n:"Telekinetic Storm",t:"Universal",c:"3 FP",d:"You fling loose debris in a 20-foot-radius sphere. Each creature in the area must make a Dexterity saving throw, taking 3d8 kinetic damage on a failure, or half on a success. The area is difficult terrain until the start of your next turn.",level:3},
+  // ── 4th level ──
+  {n:"Dominate Beast",t:"Dark",c:"4 FP",d:"You attempt to beguile a beast you can see within range. It must succeed on a Wisdom saving throw or be charmed by you for the duration of 1 minute. While charmed, you have a telepathic link with it and can issue commands.",level:4},
+  {n:"Force Confusion, Greater",t:"Dark",c:"4 FP",d:"This power assaults and twists creatures' minds, spawning delusions and provoking uncontrolled action. Each creature in a 10-foot-radius sphere must succeed on a Wisdom saving throw or be confused for 1 minute.",level:4},
+  {n:"Force Immunity, Greater",t:"Light",c:"4 FP",d:"Until the power ends (1 hour), one willing creature you touch is immune to force and necrotic damage, can't be charmed or frightened, and is immune to disease.",level:4},
+  {n:"Resilience",t:"Light",c:"4 FP",d:"You bestow hope and vitality. Choose up to five creatures within range. Each target regains 2d8 hit points and gains advantage on saving throws against being frightened for 24 hours.",level:4},
+  {n:"Stasis",t:"Universal",c:"4 FP",d:"You attempt to hold a creature paralyzed. The target must succeed on a Wisdom saving throw or be paralyzed for 1 minute. At the end of each of its turns, the target can make another Wisdom saving throw to end the effect.",level:4},
+  // ── 5th level ──
+  {n:"Dominate Mind",t:"Dark",c:"5 FP",d:"You attempt to beguile a humanoid you can see within range. It must succeed on a Wisdom saving throw or be charmed by you for the duration of 1 hour. While charmed, you have a telepathic link. Each time the target takes damage, it makes a new Wisdom saving throw.",level:5},
+  {n:"Force Meld",t:"Light",c:"5 FP",d:"You link the minds of up to ten willing creatures within range, creating a telepathic bond for 1 hour. Any creature in the bond can communicate telepathically with any other member, even across planes. Members are also aware of each other's emotional states.",level:5},
+  {n:"Mass Heal",t:"Light",c:"5 FP",d:"A flood of healing energy flows from you into injured creatures around you. You restore up to 700 hit points, divided as you choose among any number of creatures that you can see within range.",level:5},
+  {n:"Mind Trap",t:"Dark",c:"5 FP",d:"You place a mental trap in a creature's mind. The next time the creature tries to cast a power or read a creature's thoughts, it takes 5d10 psychic damage and the action or power is wasted. The trap lasts for 24 hours or until triggered.",level:5},
+  {n:"Stasis Field",t:"Universal",c:"5 FP",d:"You create a field of Force energy that holds creatures in stasis. Each creature in a 20-foot-radius sphere centered on a point you choose must succeed on a Wisdom saving throw or be paralyzed for up to 1 minute. Concentration.",level:5},
+  // ── 6th+ level ──
+  {n:"Force Destruction",t:"Dark",c:"6 FP",d:"Condensed dark side energy launches from your hand. Choose a point within range. All creatures within 40 feet of the point must make a Dexterity saving throw, taking 10d6 necrotic damage on a failure or half on a success.",level:6},
+  {n:"Heroism, Mass",t:"Light",c:"6 FP",d:"Up to twelve willing creatures you can see are imbued with bravery. They can't be frightened and gain temporary hit points equal to your forcecasting modifier at the start of each of their turns for 1 minute.",level:6},
+  {n:"Mind Blank",t:"Universal",c:"7 FP",d:"Until the power ends (24 hours), one willing creature you touch is immune to psychic damage, any effect that would sense its emotions or read its thoughts, divination powers, and the charmed condition.",level:7},
+  {n:"Force Storm",t:"Dark",c:"8 FP",d:"A storm of lightning and thunder crashes around you. Each creature within 300 feet that you can see must make a Constitution saving throw, taking 2d10 lightning and 2d10 thunder damage on a failure, or half on a success. The storm lasts for 1 minute. Concentration.",level:8},
+  {n:"Master Heal",t:"Light",c:"9 FP",d:"A flood of Force energy restores all hit points to all creatures within 60 feet that you choose. You also end all diseases and conditions listed on those creatures.",level:9},
+];
+
 async function fetchSW5ePowers(){
   if(sw5ePowers.length)return;
-  try{
-    const r=await fetch("https://raw.githubusercontent.com/sw5e-org/sw5e/master/data/ForcePower.json");
-    const data=await r.json();
-    sw5ePowers=data.filter(p=>p.name).map(p=>({
-      n:p.name,
-      t:(p.powerType||p.school||"Universal"),
-      c:p.level!==undefined?(p.level===0?"At-will":p.level+" FP"):"1 FP",
-      d:p.description||p.desc||"",
-      level:p.level||0
-    }));
-    sw5ePowers.sort((a,b)=>a.level-b.level||a.n.localeCompare(b.n));
-  }catch(e){
-    console.warn("SW5e fetch failed:",e);
-    sw5ePowers=[{n:"Force Push/Pull",t:"Universal",c:"1 FP",d:"Move a creature or object up to 30 ft.",level:1},{n:"Saber Ward",t:"Light",c:"1 FP",d:"+2 AC until end of your next turn.",level:1},{n:"Battle Meditation",t:"Light",c:"2 FP",d:"Allies within 30 ft. gain advantage on one attack roll.",level:2},{n:"Force Camouflage",t:"Universal",c:"2 FP",d:"Invisible until you attack or cast a power.",level:2},{n:"Affect Mind",t:"Light",c:"1 FP",d:"DC WIS save or creature is charmed for 1 minute.",level:1},{n:"Telekinesis",t:"Universal",c:"2 FP",d:"Move objects or creatures. Concentration, 10 minutes.",level:2},{n:"Heal",t:"Light",c:"1-3 FP",d:"Restore 1d8 HP per FP. Touch range.",level:1},{n:"Force Lightning",t:"Dark",c:"2 FP",d:"2d6 lightning damage, DEX save for half.",level:2},{n:"Force Choke",t:"Dark",c:"2 FP",d:"Restrain and deal 1d6 kinetic damage per round.",level:2},{n:"Stun",t:"Universal",c:"2 FP",d:"CON save or stunned until end of next turn.",level:2}];
+  // Try the sw5e.com API first — open to browsers, returns full power list
+  const tried=[];
+  const urls=[
+    "https://sw5e.com/api/ForcePower/?ordering=name&format=json&limit=500",
+    "https://www.sw5e.com/api/ForcePower/?ordering=name&format=json"
+  ];
+  for(const url of urls){
+    try{
+      const r=await fetch(url);
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const data=await r.json();
+      const items=data.results||data;
+      if(Array.isArray(items)&&items.length>10){
+        sw5ePowers=items.filter(p=>p.name).map(p=>({
+          n:p.name,
+          t:(p.powerType||p.alignment||"Universal"),
+          c:p.level===0?"At-will":(p.level||1)+" FP",
+          d:(p.description||p.desc||"").replace(/<[^>]+>/g,"").slice(0,400),
+          level:p.level||0
+        }));
+        sw5ePowers.sort((a,b)=>a.level-b.level||a.n.localeCompare(b.n));
+        console.log("SW5e API: loaded "+sw5ePowers.length+" force powers from "+url);
+        filterPowers();
+        return;
+      }
+    }catch(e){tried.push(url+": "+e.message);}
   }
+  console.warn("SW5e API unavailable, using built-in list. Errors:",tried);
+  sw5ePowers=SW5E_POWERS_FALLBACK;
   filterPowers();
 }
 
@@ -1706,8 +1800,11 @@ function filterPowers(){
     const typeMatch=ppkrFilter==="all"||p.t.toLowerCase().includes(ppkrFilter);
     const searchMatch=!q||p.n.toLowerCase().includes(q)||p.d.toLowerCase().includes(q);
     return typeMatch&&searchMatch;
-  }).slice(0,50);
+  });
   if(!filtered.length){list.innerHTML='<div class="ppkr-loading">No powers found.</div>';return;}
+  // Show count in header
+  const countEl=document.querySelector(".ppkr-title");
+  if(countEl)countEl.textContent="Force Power Database — "+filtered.length+(filtered.length===sw5ePowers.length?"":" of "+sw5ePowers.length)+" powers";
   const typeColor={universal:"color:var(--blue)",light:"color:var(--green)",dark:"color:var(--red)"};
   list.innerHTML=filtered.map(p=>`
     <div class="ppkr-item" onclick="selectPower(${JSON.stringify(p).replace(/"/g,'&quot;')})">
@@ -1756,6 +1853,50 @@ function confirmAddPower(){
   closePowerPicker();
 }
 
+function usePower(id, idx){
+  const c=gc(id);
+  const p=c.powers[idx];
+  if(!p)return;
+  // Parse cost — "At-will" = 0, "1 FP" = 1, "1–9 FP" = ask, "3–9 FP" = ask
+  const raw=(p.c||"1 FP").toLowerCase();
+  let cost=0;
+  if(raw==="at-will"||raw==="0"){
+    cost=0;
+  } else if(/^\d+\s*fp$/.test(raw)){
+    cost=parseInt(raw);
+  } else if(/\d+[-–]\d+/.test(raw)){
+    // Variable cost — prompt player
+    const match=raw.match(/(\d+)/);
+    const min=match?parseInt(match[1]):1;
+    const input=prompt(p.n+" — Variable cost ("+p.c+"). How many FP to spend?", min);
+    if(input===null)return;
+    cost=Math.max(0,parseInt(input)||min);
+  } else {
+    cost=parseInt(raw)||1;
+  }
+  if(cost===0){
+    // At-will — just flash feedback, no deduction
+    const panel=document.getElementById("dice-panel");
+    if(panel)panel.classList.add("open");
+    rollHistory.unshift({label:p.n+" (at-will)",total:"—",isCrit:false,isFail:false,breakdown:"No FP cost"});
+    if(rollHistory.length>10)rollHistory.pop();
+    renderHistory();
+    return;
+  }
+  if(c.fp<cost){
+    alert("Not enough Force Points! Need "+cost+" FP, have "+c.fp+".");
+    return;
+  }
+  upd(id,c=>{c.fp=Math.max(0,c.fp-cost);});
+  // Log to dice panel
+  const panel=document.getElementById("dice-panel");
+  if(panel)panel.classList.add("open");
+  const fpAfter=Math.max(0,c.fp-cost);
+  rollHistory.unshift({label:p.n,total:"-"+cost+" FP",isCrit:false,isFail:false,breakdown:"Spent "+cost+" FP · "+c.fp+" → "+fpAfter+" remaining"});
+  if(rollHistory.length>10)rollHistory.pop();
+  renderHistory();
+}
+window.usePower=usePower;
 window.openPowerPicker=openPowerPicker;
 window.closePowerPicker=closePowerPicker;
 window.setPowerFilter=setPowerFilter;
