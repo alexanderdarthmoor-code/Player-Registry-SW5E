@@ -92,7 +92,7 @@ getRedirectResult(auth)
   })
   .catch(e => console.warn("Redirect result error:", e.code, e.message));
 
-const LIVE_CHAR_FIELDS = ["hp","hpTemp","fp","credits","inv","wpns","dt","rels","bio"];
+const LIVE_CHAR_FIELDS = ["hp","hpTemp","fp","credits","inv","wpns","dt","rels","bio","features","langs"];
 
 async function pushChar(c) {
   if (!currentUser) return;
@@ -129,6 +129,34 @@ window.fbSaveCodex = async function(data) {
   if (!currentUser) return;
   try { await setDoc(doc(db, "campaign", "codex"), data, { merge: false }); }
   catch(e) { console.warn("Codex save error", e); }
+};
+
+// HQ / Stronghold Firestore sync
+window.fbGetHQ = async function() {
+  try {
+    const snap = await getDoc(doc(db, "campaign", "hq"));
+    if (snap.exists()) return snap.data();
+  } catch(e) { console.warn("HQ load error", e); }
+  return null;
+};
+window.fbSaveHQ = async function(data) {
+  if (!currentUser) return;
+  try { await setDoc(doc(db, "campaign", "hq"), data, { merge: false }); }
+  catch(e) { console.warn("HQ save error", e); }
+};
+
+// Session Notes Firestore sync
+window.fbGetSessions = async function() {
+  try {
+    const snap = await getDoc(doc(db, "campaign", "sessions"));
+    if (snap.exists()) return snap.data();
+  } catch(e) { console.warn("Sessions load error", e); }
+  return null;
+};
+window.fbSaveSessions = async function(data) {
+  if (!currentUser) return;
+  try { await setDoc(doc(db, "campaign", "sessions"), data, { merge: false }); }
+  catch(e) { console.warn("Sessions save error", e); }
 };
 
 async function loadFromFirestore() {
@@ -269,6 +297,29 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .skv-roll{border-bottom:1px dashed var(--ab2);border-radius:2px;padding:1px 3px;transition:background .15s,color .15s}
 .skv-roll:hover{background:var(--amber);color:var(--bg);border-color:var(--amber)}
 .pwr{display:grid;grid-template-columns:1fr auto auto;gap:.6rem;align-items:start;padding:5px 0;border-bottom:1px solid var(--bdr)}
+/* Session Notes */
+.sn-wrap{padding:1.25rem 1.5rem;max-width:900px}
+.sn-story{background:var(--s1);border:1px solid var(--bdr2);border-radius:4px;margin-bottom:1.5rem;overflow:hidden}
+.sn-story-hdr{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1rem;background:var(--s2);border-bottom:1px solid var(--bdr)}
+.sn-story-title{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--txtb);letter-spacing:.02em}
+.sn-story-body{padding:1rem;font-size:13px;color:var(--txt);line-height:1.75;white-space:pre-wrap;min-height:60px;cursor:pointer;transition:background .15s}
+.sn-story-body:hover{background:var(--s2)}
+.sn-story-body em{color:var(--txt3)}
+.sn-list-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.sn-list-title{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
+.sn-session{background:var(--s1);border:1px solid var(--bdr);border-radius:4px;margin-bottom:.65rem;overflow:hidden}
+.sn-session-hdr{display:flex;align-items:center;gap:10px;padding:.65rem 1rem;background:var(--s2);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none}
+.sn-session-hdr:hover{background:var(--s1)}
+.sn-session-num{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--amber);min-width:28px}
+.sn-session-title{font-size:13px;font-weight:600;color:var(--txtb);flex:1}
+.sn-session-date{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.06em}
+.sn-session-chevron{font-size:11px;color:var(--txt3);transition:transform .2s}
+.sn-session.open .sn-session-chevron{transform:rotate(180deg)}
+.sn-session-body{display:none;padding:.85rem 1rem;font-size:12px;color:var(--txt);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--bdr)}
+.sn-session.open .sn-session-body{display:block}
+.sn-session-actions{display:flex;gap:6px;margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--bdr)}
+.sn-empty{font-size:13px;color:var(--txt3);font-style:italic;padding:1rem 0}
+
 /* Force Power Cards */
 .fpc-grid{display:flex;flex-direction:column;gap:.4rem}
 .fpc{background:var(--s2);border:1px solid var(--bdr2);border-radius:4px;padding:.6rem .75rem;display:grid;grid-template-columns:1fr auto;gap:.3rem .6rem;align-items:start}
@@ -384,6 +435,46 @@ table.wpn tr:last-child td{border-bottom:none}
 .bio-body{font-size:13px;color:var(--txt);line-height:1.7;min-height:80px;cursor:pointer;border-radius:3px;padding:4px 2px;transition:background .15s;white-space:pre-wrap}
 .bio-body:hover{background:var(--s2)}
 .opspg{padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1.1rem;max-width:1100px}
+/* Rebel Stronghold System */
+.hq-resources{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.85rem}
+.hq-res{background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:8px 10px;text-align:center}
+.hq-res-val{font-family:var(--fd);font-size:22px;font-weight:700;line-height:1.1}
+.hq-res-lbl{font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-top:2px}
+.hq-tier-row{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;flex-wrap:wrap}
+.hq-tier-pip{width:26px;height:26px;border-radius:50%;border:2px solid var(--bdr2);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:10px;color:var(--txt3);cursor:default}
+.hq-tier-pip.active{background:var(--amber);border-color:var(--amber);color:var(--bg);font-weight:700}
+.hq-tier-name{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--txtb);margin-left:4px}
+.hq-tier-progress{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em;margin-left:auto}
+.hq-section-lbl{font-family:var(--fm);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--adim);margin-bottom:.5rem}
+.hq-upgrades{display:flex;flex-direction:column;gap:.25rem}
+.hq-tier-section{margin-bottom:.6rem}
+.hq-tier-hdr{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:2px solid var(--bdr);margin-bottom:.3rem}
+.hq-tier-label{font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);font-weight:600}
+.hq-tier-count{font-family:var(--fm);font-size:9px;color:var(--txt3)}
+.hq-tier-hdr{cursor:pointer;user-select:none}
+.hq-tier-hdr:hover .hq-tier-label{color:var(--txt)}
+.hq-tier-chevron{font-size:10px;color:var(--txt3);transition:transform .2s;margin-left:6px}
+.hq-tier-section.collapsed .hq-tier-chevron{transform:rotate(-90deg)}
+.hq-tier-section.collapsed .hq-tier-upgrades{display:none}
+.hq-upg{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:3px;cursor:pointer;transition:background .12s;border:1px solid transparent}
+.hq-upg:hover{background:var(--s2);border-color:var(--bdr)}
+.hq-upg.done{background:rgba(61,186,126,.07);border-color:rgba(61,186,126,.25)}
+.hq-upg-check{width:16px;height:16px;border-radius:2px;border:1px solid var(--bdr2);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px;color:var(--green);font-weight:700;transition:background .12s,border-color .12s}
+.hq-upg.done .hq-upg-check{background:rgba(61,186,126,.2);border-color:var(--green)}
+.hq-upg-body{flex:1;min-width:0}
+.hq-upg-name{font-size:12px;font-weight:600;color:var(--txtb);margin-bottom:2px}
+.hq-upg.done .hq-upg-name{color:var(--green)}
+.hq-upg-cost{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.04em;margin-bottom:2px}
+.hq-upg-benefit{font-size:11px;color:var(--txt);line-height:1.45}
+.hq-upg-narrative{font-size:10px;color:var(--txt3);font-style:italic;margin-top:2px;line-height:1.4}
+.hq-contact-list{display:flex;flex-direction:column;gap:.35rem}
+.hq-contact{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px}
+.hq-contact-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.hq-dot-active{background:var(--green)}
+.hq-dot-cd{background:var(--txt3)}
+.hq-contact-status{font-family:var(--fm);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+.hq-outpost-list{display:flex;flex-direction:column;gap:.35rem}
+.hq-outpost{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px}
 .pgt{font-family:var(--fd);font-size:26px;font-weight:700;color:var(--txtb);letter-spacing:.03em}
 .pgs{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;margin-top:3px}
 .fsg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
@@ -418,6 +509,27 @@ table.wpn tr:last-child td{border-bottom:none}
 .shn{font-family:var(--fd);font-size:19px;font-weight:700;color:var(--txtb);letter-spacing:.02em;line-height:1.15}
 .shcl{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.07em;margin-top:2px}
 .shtabs{display:flex;background:var(--bg);border-bottom:1px solid var(--bdr)}
+/* Character sheet inner tabs */
+.ctabs{display:flex;border-bottom:2px solid var(--bdr);margin-bottom:0;background:var(--s1)}
+.ctab{flex:1;padding:8px 4px;font-family:var(--fm);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;transition:color .15s,border-color .15s}
+.ctab:hover{color:var(--txt)}
+.ctab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.cpane{display:none}.cpane.active{display:block}
+/* Features section */
+.feat-list{display:flex;flex-direction:column;gap:.4rem}
+.feat-card{background:var(--s2);border:1px solid var(--bdr2);border-radius:4px;padding:.6rem .75rem}
+.feat-card-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.feat-name{font-size:13px;font-weight:600;color:var(--txtb);flex:1}
+.feat-src{font-family:var(--fm);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3);border:1px solid var(--bdr2);border-radius:2px;padding:2px 5px}
+.feat-desc{font-size:11px;color:var(--txt2);line-height:1.55}
+.lang-grid{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem}
+.lang-pill{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:5px 10px;font-size:12px;color:var(--txtb)}
+.lang-pill-note{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.05em}
+.lang-pill .dbtn{margin-left:4px;color:var(--txt3)}
+.feat-filters{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:.6rem}
+.feat-filter{font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);background:none;border:1px solid var(--bdr);border-radius:2px;padding:3px 9px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.feat-filter:hover{color:var(--txt);border-color:var(--bdr2)}
+.feat-filter.active{color:var(--amber);border-color:var(--ab2);background:var(--aglow)}
 .shtab{flex:1;padding:7px 3px;font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .15s,border-color .15s}
 .shtab:hover{color:var(--txt)}
 .shtab.active{color:var(--amber);border-bottom-color:var(--amber)}
@@ -682,7 +794,23 @@ const CHARS=[
    credits:850,
    dt:[{a:"Force Meditation",r:"Regained 1 FP. Glimpsed a figure in white.",s:"success"},{a:"Form Practice",r:"Focusing on Shien. +1 use per long rest.",s:"success"},{a:"Rebel Recruit",r:"DC 17 check pending.",s:"pending"}],
    rels:[{n:"Knight Aelix",ro:"Mentor / Jedi Contact",note:"Guided you to the Temple. Something unspoken between him and the Senator.",b:4,ic:"🟣"},{n:"Kierra",ro:"Padawan / Ally",note:"First met you at the Rancor's Roost.",b:3,ic:"🟡"},{n:"Colonel Chasid",ro:"Rebel Commander",note:"Earned his trust at Veilwatch.",b:3,ic:"🔴"},{n:"Queen Celine",ro:"Virellian Patron",note:"Meets you with warmth and careful calculation.",b:2,ic:"🟢"}],
-   bio:""},
+   features:[
+    {n:"Sneak Attack",s:"Operative 1",d:"Once per turn, you can deal an extra 2d6 damage to one creature you hit with an attack if you have advantage on the attack roll, or if another enemy of the target is within 5 feet of it and that enemy isn't incapacitated. You don't need advantage if you use a finesse or ranged weapon. This extra damage increases as you gain Operative levels."},
+    {n:"Forcecasting",s:"Sentinel 1",d:"You can cast force powers using Wisdom as your forcecasting ability. Force save DC = 8 + proficiency bonus + WIS modifier. Force attack bonus = proficiency bonus + WIS modifier. You have a number of force points equal to your Sentinel level + your WIS modifier."},
+    {n:"Led by the Force",s:"Sentinel 1",d:"You can add half your proficiency bonus (round down) to any ability check you make that doesn't already include your proficiency bonus. Additionally, you can't be surprised while you are conscious."},
+    {n:"Cunning Action",s:"Operative 2",d:"Your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns to Dash, Disengage, or Hide."},
+    {n:"Operative Exploits",s:"Operative 3",d:"You have learned a set of special techniques called Operative Exploits. You know three exploits of your choice. You can use each exploit once per short or long rest unless otherwise noted. Your exploit save DC = 8 + proficiency bonus + DEX modifier."},
+    {n:"Bad Feeling",s:"Operative 3",d:"You have a preternatural sense for detecting danger. You have advantage on initiative rolls. Additionally, when you roll initiative and you are not surprised, you can move up to half your speed as a reaction before the round begins."},
+    {n:"Operative Practice",s:"Operative 3",d:"You choose a specialty that defines your approach: Gunslinger, Sharpshooter, or another practice. Your practice grants you features at 3rd level, and again at 9th, 13th, and 17th level."},
+    {n:"Ability Score Increase",s:"Operative 3",d:"When you reach 4th level in this class, and again at 8th, 12th, 16th, and 19th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. You can't increase an ability score above 20 using this feature."},
+    {n:"Charismatic",s:"Species — Twi'lek",d:"You have proficiency in the Persuasion skill, and you have advantage on Charisma (Persuasion) checks made to convince humanoids who can see your lekku that you are telling the truth."},
+    {n:"Darkvision",s:"Species — Twi'lek",d:"Accustomed to dim environments, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray."},
+    {n:"Elegant Dancers",s:"Species — Twi'lek",d:"You have proficiency in the Performance skill. Additionally, you have advantage on Charisma (Performance) checks that rely on dance."},
+    {n:"Languages",s:"Species — Twi'lek",d:"You can speak, read, and write Galactic Basic and Twi'leki. Twi'leki is a fluid, expressive language characterized by lekku gestures that supplement spoken words. Many Twi'leks also learn Huttese due to their frequent contact with Hutt-controlled worlds."},
+    {n:"Natural Antitoxins",s:"Species — Twi'lek",d:"You have advantage on saving throws against poison, and you have resistance against poison damage. Additionally, your body naturally produces antitoxins; if you spend 1 hour creating antitoxins during a short rest, you produce a number of antitoxin doses equal to your Constitution modifier (minimum 1)."},
+    {n:"Unarmed Combatant",s:"Species — Twi'lek",d:"Your unarmed strikes deal 1d4 kinetic damage. Additionally, when you hit a creature with an unarmed strike as part of the Attack action, you can make one unarmed strike as a bonus action."},
+    {n:"Quick-Fingered",s:"Operative Exploit",d:"As a bonus action, you can make a Dexterity (Sleight of Hand) check to pick a pocket, conceal a small object, or perform a small feat of manual dexterity. You have advantage on this check if the target is distracted."},
+  ],langs:[{n:"Galactic Basic",note:"Speak, read, write"},{n:"Twi'leki",note:"Native — includes lekku gestures"},{n:"Huttese",note:"Common in Hutt space"}],bio:""},
   {id:"pc2",name:"Evr'ar'uhyo (Raru)",species:"Chiss",cls:"Operative 4 / Sentinel 3",em:"🎯",lbl:"Operative",col:"#5b9bd5",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Evr'ar'uhyo%20(Raru).jpg",
    hp:38,hpMax:44,hpTemp:5,ac:15,init:"+5",spd:"35 ft.",fp:4,fpMax:6,
    abs:{STR:[10,0],DEX:[18,4],CON:[12,1],INT:[14,2],WIS:[14,2],CHA:[16,3]},
@@ -694,7 +822,22 @@ const CHARS=[
    credits:1350,
    dt:[{a:"Espionage — Crymorah",r:"Confirmed Syndicate on Ryndal IV.",s:"success"},{a:"Bond Deepening — Aelix",r:"DC 13 passed. Bond Boon: one reroll.",s:"success"},{a:"Data Decryption",r:"Partial — one name still redacted.",s:"pending"}],
    rels:[{n:"Naresh",ro:"Smuggler / Intel Contact",note:"His Crymorah tip cost him something. You owe a favor.",b:3,ic:"🟠"},{n:"Knight Aelix",ro:"Jedi Contact / Ally",note:"Bond Boon earned.",b:4,ic:"🟣"},{n:"Senator Allendor",ro:"Political Cover",note:"She sees you as an asset. That cuts both ways.",b:2,ic:"🟢"},{n:"Captain Mahna Tir",ro:"Air Wing Commander",note:"Respects getting in and out without a firefight.",b:3,ic:"🔴"}],
-   bio:""},
+   features:[
+    {n:"Force Recovery",s:"Sentinel 1",d:"You have learned to regain some of your Force energy by meditating. Once per day when you finish a short rest, you can choose to recover Force points. The number of Force points you can recover equals half your Sentinel level (rounded up) + your Wisdom modifier (minimum of 1)."},
+    {n:"Forcecasting",s:"Sentinel 1",d:"You can cast force powers drawing on the light side of the Force, using Wisdom as your forcecasting ability. Force save DC = 8 + proficiency bonus + WIS modifier. Force attack bonus = proficiency bonus + WIS modifier. You have a number of force points equal to your Sentinel level + your Wisdom modifier."},
+    {n:"Potent Aptitude",s:"Scholar 1",d:"Your intellectual prowess lends itself to your skills. When you make an ability check using a skill you are proficient in, you can expend one Scholarly Aptitude die (a d6, increasing as you level) and add it to the result. You can use this feature a number of times equal to your Intelligence modifier, and regain all expended uses when you finish a short or long rest."},
+    {n:"Techcasting",s:"Scholar 1",d:"You have derived powers from schematics and have learned to cast tech powers. Intelligence is your techcasting ability. Tech save DC = 8 + proficiency bonus + INT modifier. Tech attack bonus = proficiency bonus + INT modifier. You have a number of tech points equal to your Scholar level + your Intelligence modifier."},
+    {n:"Infuse Item",s:"Engineer 2",d:"You have gained the ability to imbue mundane items with certain tech powers. Whenever you finish a long rest, you can touch a number of nonmagical objects, imbuing each with one of your infusion options. An infused item can be used by anyone. When you die or finish a long rest, the infusion ends. You can maintain a number of infusions equal to half your Engineer level (rounded down)."},
+    {n:"Tool Expertise",s:"Engineer 1",d:"Your proficiency bonus is doubled for any ability check you make that uses your proficiency with a tool. Additionally, you can use your Intelligence modifier instead of Dexterity when making Tinker's Tools checks."},
+    {n:"Engineering Discipline",s:"Engineer 3",d:"You choose an Engineering Discipline that shapes your specialization: Armormech, Armstech, Astrotech, Biotech, or Cybertech. Your discipline grants you features at 3rd level, and again at 5th, 9th, 15th, and 18th level."},
+    {n:"Ability Score Increase",s:"Scholar 4",d:"When you reach 4th level, and again at 8th, 12th, 16th, and 19th level in this class, you can increase one ability score of your choice by 2, or two ability scores by 1 each. You can't increase an ability score above 20 using this feature."},
+    {n:"Darkvision",s:"Species — Chiss",d:"Accustomed to the dim conditions of Csilla's underground cities, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern colour in darkness, only shades of gray."},
+    {n:"Superior Darkvision",s:"Species — Chiss",d:"Your Chiss heritage gives you exceptional darkvision. The range of your Darkvision extends to 120 feet, and you can see in magical darkness as if it were dim light."},
+    {n:"Tech Resistance",s:"Species — Chiss",d:"Chiss possess a natural resistance to tech powers derived from long exposure to advanced technology. You have advantage on saving throws against tech powers and effects. Additionally, you have resistance to damage dealt by tech powers."},
+    {n:"Martial Proficiency",s:"Species — Chiss",d:"You are proficient with light and medium armor, as well as blaster pistols and blaster rifles. The Chiss Ascendancy maintains a tradition of military readiness among its citizens."},
+    {n:"Politically Minded",s:"Species — Chiss",d:"Chiss society is built on intricate political structures and careful diplomacy. You gain proficiency in the Insight and Persuasion skills. If you are already proficient in either skill, you gain expertise in it instead."},
+    {n:"Investigator",s:"Scholar Archetype",d:"You focus your scholarly pursuits on investigation and deduction. You gain proficiency in the Investigation skill. If already proficient, you gain expertise. Additionally, as an action you can make an Investigation check against a creature you can see; on a success you learn one of its ability scores, resistances, or immunities of your choice."},
+  ],langs:[{n:"Galactic Basic",note:"Speak, read, write"},{n:"Cheunh",note:"Native — Chiss language"},{n:"Minnisiat",note:"Trade language — common in the Unknown Regions"}],bio:""},
   {id:"pc3",name:"Rorchiir",species:"Wookie",cls:"Consular 6 / Scholar 1",em:"✨",lbl:"Consular",col:"#9b7fe8",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Rorchiir.jpeg",
    hp:34,hpMax:40,hpTemp:0,ac:13,init:"+1",spd:"30 ft.",fp:8,fpMax:12,
    abs:{STR:[8,-1],DEX:[12,1],CON:[12,1],INT:[16,3],WIS:[18,4],CHA:[14,2]},
@@ -706,9 +849,26 @@ const CHARS=[
    credits:420,
    dt:[{a:"Holocron Study — Ossus",r:"Decoded partial coordinates in the Chorlian Drift.",s:"success"},{a:"Vision Quest",r:"Saw a woman in white on a red planet. Sylos Mir won't explain.",s:"success"},{a:"Mentorship — Vero & Talia",r:"Padawans will cover your exit next mission.",s:"success"}],
    rels:[{n:"Master Voska",ro:"Jedi Founder / Mentor",note:"He believes the Force guided you here. That weight is real.",b:4,ic:"🟣"},{n:"Initiate Sylos Mir",ro:"Vossar Seer",note:"Has seen you in his visions. Won't say what happened.",b:3,ic:"🟣"},{n:"Kierra",ro:"Padawan / Student",note:"A natural teacher. Stepped in where the Knights couldn't.",b:4,ic:"🟡"},{n:"Queen Celine",ro:"Virellian Patron",note:"Drawn to your Force sensitivity.",b:3,ic:"🟢"}],
-   bio:""}
+   features:[
+    {n:"Rage",s:"Berserker 1",d:"In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. While raging, you have advantage on Strength checks and Strength saving throws; you gain a +2 bonus to melee weapon damage rolls that use Strength; and you have resistance to bludgeoning, piercing, and slashing damage. Your rage lasts for 1 minute and ends early if you are knocked unconscious or you end your turn without attacking or taking damage. You can rage a number of times equal to your proficiency bonus, and regain all uses on a long rest."},
+    {n:"Unarmored Defense",s:"Berserker 1",d:"While you are not wearing armor, your Armor Class equals 10 + your Dexterity modifier + your Constitution modifier. You can use a shield and still gain this benefit."},
+    {n:"Channel the Force",s:"Berserker 1",d:"You gain a pool of Force energy represented by Force points. You can spend these points to fuel your rage or other Berserker features. You regain all spent Force points when you finish a long rest."},
+    {n:"Forcecasting",s:"Consular 1",d:"Wisdom is your forcecasting ability. Force save DC = 8 + proficiency bonus + WIS modifier. Force attack bonus = proficiency bonus + WIS modifier. As a Consular, your Force point maximum equals your Consular level × 2 + your WIS modifier."},
+    {n:"Berserker Instincts",s:"Berserker 1",d:"You have supernatural awareness honed by primal fury. You can't be surprised while you are conscious. Additionally, you add double your proficiency bonus to initiative rolls."},
+    {n:"Reckless Attack",s:"Berserker 2",d:"You can throw aside all concern for defense to attack with fierce desperation. When you make your first attack on your turn, you can decide to attack recklessly. Doing so gives you advantage on melee weapon attack rolls using Strength during this turn, but attack rolls against you have advantage until your next turn."},
+    {n:"Berserker Approach",s:"Berserker 3",d:"You choose an approach that shapes your primal fury. Your chosen approach grants you features at 3rd, 6th, and 14th level. The approach defines how your rage manifests — whether through brute force, terrifying presence, or something more supernatural."},
+    {n:"Danger Sense",s:"Berserker 2",d:"You gain an uncanny sense for danger. You have advantage on Dexterity saving throws against effects that you can see, such as traps and powers. To gain this benefit, you can't be blinded, deafened, or incapacitated."},
+    {n:"Ability Score Increase",s:"Berserker 4",d:"When you reach 4th level, and again at 8th, 12th, 16th, and 19th level in this class, you can increase one ability score of your choice by 2, or two ability scores by 1 each. You can't increase an ability score above 20 using this feature."},
+    {n:"Claws",s:"Species — Wookiee",d:"Your claws are natural weapons. You can use them to make unarmed strikes. When you hit with them, the strike deals 1d6 + your Strength modifier slashing damage, instead of the bludgeoning damage normal for an unarmed strike."},
+    {n:"Darkvision",s:"Species — Wookiee",d:"Accustomed to life in dense forests, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet as if it were bright light, and in darkness as if it were dim light. You can't discern colour in darkness, only shades of gray."},
+    {n:"Hide",s:"Species — Wookiee",d:"You have a thick coat of fur that insulates you from cold environments. You have resistance to cold damage. Additionally, you have advantage on Constitution saving throws made to avoid exhaustion due to extreme cold."},
+    {n:"Menacing",s:"Species — Wookiee",d:"You gain proficiency in the Intimidation skill. Your imposing frame and fearsome reputation precede you — creatures that can see you have disadvantage on saving throws against being frightened by you."},
+    {n:"Powerful Build",s:"Species — Wookiee",d:"You count as one size larger when determining your carrying capacity and the weight you can push, drag, or lift. Additionally, you have advantage on Strength (Athletics) checks made to grapple creatures."},
+    {n:"Treeclimber",s:"Species — Wookiee",d:"You have a climbing speed equal to your walking speed. You can climb difficult surfaces, including upside down on ceilings, without needing to make an ability check — provided the surface has something to grip."},
+    {n:"Brawny",s:"Species — Wookiee",d:"You are proficient in the Athletics skill. If you are already proficient, you gain expertise in it instead, doubling your proficiency bonus for Athletics checks."},
+  ],langs:[{n:"Galactic Basic",note:"Understand only — cannot speak"},{n:"Shyriiwook",note:"Native — speak, understand"},{n:"Xaczik",note:"Alternate Wookiee dialect"}],bio:""}
 ];
-const FACTION={Resources:{v:25,col:"#d4873a",d:"Credits, supplies, safe houses"},Morale:{v:40,col:"#3dba7e",d:"Cell cohesion & will to fight"},Influence:{v:30,col:"#9b7fe8",d:"Public & political reach"},Military:{v:30,col:"#d45b5b",d:"Combat strength & readiness"},Secrecy:{v:60,col:"#5b9bd5",d:"How hidden the cell remains"}};
+const FACTION={Resources:{v:25,col:"#d4873a",d:"Credits, supplies, safe houses"},Morale:{v:40,col:"#3dba7e",d:"Cell cohesion & will to fight"},Influence:{v:30,col:"#9b7fe8",d:"Public & political reach"},Military:{v:30,col:"#d45b5b",d:"Combat strength & readiness"},Secrecy:{v:60,col:"#5b9bd5",d:"How hidden the cell remains"},Reputation:{v:50,col:"#c0a060",d:"How the galaxy perceives the cell"},Control:{v:0,col:"#7ec8a0",d:"Planetary systems openly supporting the cause"}};
 const EVENTS=[{s:1,t:"Veilwatch Extraction",d:"Rangers defected. Listening post destroyed.",e:"+10 Morale",pos:1},{s:1,t:"Tebo Station",d:"Crymorah confirmed. Slaves freed.",e:"+10 Influence",pos:1},{s:2,t:"Public Order Directive",d:"Imperial Emergency Act 746-22. Disappearances begin.",e:"−10 Influence",pos:0},{s:2,t:"Prison Barge X-103",d:"Detainees extracted. Inquisitor confirmed.",e:"+5 Morale, −5 Secrecy",pos:1},{s:2,t:"Ossus Holocron",d:"Master Varo Xel's star map fragment decoded.",e:"+10 Resources",pos:1}];
 const SHIPS=[
   {badge:"r",faction:"Rebel Cell",name:"T-65 X-Wing Starfighter",image:"",cls:"Incom Corporation T-65",locked:false,
@@ -959,7 +1119,31 @@ function renderChar(c){
     const pips=Array.from({length:5},(_,i)=>`<div class="bondp${i<r.b?" on":""}" onclick="setBond('${c.id}',${ri},${i+1})"></div>`).join("");
     return `<div class="relr"><div class="relic">${r.ic}</div><div><div class="reln">${r.n}</div><div class="relro">${r.ro}</div><div class="relnote" onclick="eRelNote('${c.id}',${ri})">${r.note}</div><div class="bondm">${pips}</div></div></div>`;
   }).join("");
-  return `<div class="cl"><aside class="sb"><div class="port">${portHtml}<div class="plbl">${c.lbl}</div></div><div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:var(--txtb);line-height:1.1;cursor:pointer" onclick="editName('${c.id}')" title="Click to edit">${c.name}</div><div style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;cursor:pointer" onclick="editSpecies('${c.id}')" title="Click to edit">${c.species}</div><div style="font-size:13px;color:${c.col};margin-top:5px;font-weight:500;cursor:pointer" onclick="editCls('${c.id}')" title="Click to edit">${c.cls}</div></div><div class="sblk"><div class="blbl">Hit Points</div><div class="hprow"><button class="hpbtn" onclick="aHP('${c.id}',-1)">−</button><div style="display:flex;align-items:baseline;gap:4px;flex:1;justify-content:center"><span class="hpnum" style="color:${hcol}" onclick="sHP('${c.id}')" title="Click to set">${c.hp}</span><span class="hpsep">/</span><span class="hpmax" onclick="editMaxHP('${c.id}')" style="cursor:pointer" title="Click to edit max">${c.hpMax}</span></div><button class="hpbtn" onclick="aHP('${c.id}',1)">+</button></div><div class="tmphp" onclick="sTemp('${c.id}')">${c.hpTemp?"+"+c.hpTemp+" temp HP":"+ Add temp HP"}</div></div><div class="sblk"><div class="blbl">Force Points</div><div style="font-family:var(--fd);font-size:20px;font-weight:700;color:#9b7fe8;line-height:1;margin-bottom:4px">${c.fp} / <span onclick="editMaxFP('${c.id}')" style="cursor:pointer;border-bottom:1px dashed #9b7fe8" title="Click to edit max">${c.fpMax}</span></div><div class="fprow">${fpPips}</div></div><div class="sblk"><div class="blbl">Combat</div><div class="mg"><div class="ms" onclick="editAC('${c.id}')" style="cursor:pointer"><div class="mv">${c.ac}</div><div class="ml">AC</div></div><div class="ms" onclick="editInit('${c.id}')" style="cursor:pointer"><div class="mv">${c.init}</div><div class="ml">Init</div></div><div class="ms" onclick="editSpd('${c.id}')" style="cursor:pointer;grid-column:1/-1"><div class="mv">${c.spd}</div><div class="ml">Speed</div></div></div></div></aside><div class="cm"><div class="sec"><div class="sch"><span class="sct">Ability Scores</span></div><div class="scb"><div class="abg">${abItems}</div></div></div><div class="sec"><div class="sch"><span class="sct">Saves &amp; Skills</span></div><div class="scb"><div class="ssg">${abGrouped}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:4px"></span>Proficient &nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px"></span>Expertise</div></div></div><div class="sec"><div class="sch"><span class="sct">Force Powers</span><button class="abtn" onclick="openPowerPicker('${c.id}')">+ Add power</button></div><div class="scb">${c.powers.length?powersHtml:'<div style="font-size:12px;color:var(--txt3);font-style:italic">No powers known yet.</div>'}</div></div><div class="sec"><div class="sch"><span class="sct">Weapons</span><button class="abtn" onclick="addWpn('${c.id}')">+ Add weapon</button></div><div class="scb"><table class="wpn"><thead><tr><th>Name</th><th title="Click to roll attack">Attack ↗</th><th title="Click to roll damage">Damage ↗</th><th>Type</th><th>Range</th><th>Notes</th><th></th></tr></thead><tbody>${wpns||"<tr><td colspan='7' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No weapons.</td></tr>"}</tbody></table></div></div><div class="sec"><div class="sch"><span class="sct">Inventory</span><button class="abtn" onclick="addItem('${c.id}')">+ Add item</button></div><div class="scb"><table class="inv"><thead><tr><th>Item</th><th>Qty</th><th>Wt</th><th>Rarity</th><th>Notes</th><th></th></tr></thead><tbody>${inv||"<tr><td colspan='6' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No items.</td></tr>"}</tbody></table><div class="crrow"><span class="crv" onclick="sCr('${c.id}')" title="Click to edit">${c.credits.toLocaleString()}</span><span class="crl">credits</span></div></div></div><div class="sec"><div class="sch"><span class="sct">Relationships &amp; Bonds</span></div><div class="scb"><div>${rels}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)">Click pips to adjust bond · 3+ = Bond Boon available</div></div></div><div class="sec"><div class="sch"><span class="sct">Background &amp; History</span><button class="abtn" onclick="editBio('${c.id}')" style="color:var(--amber);border-color:var(--ab2)">Edit</button></div><div class="scb"><div class="bio-body" id="bio-${c.id}" onclick="editBio('${c.id}')" title="Click to edit">${c.bio||'<em style="color:var(--txt3)">No background written yet.</em>'}</div></div></div></div></div>`;
+  return `<div class="cl"><aside class="sb"><div class="port">${portHtml}<div class="plbl">${c.lbl}</div></div><div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:var(--txtb);line-height:1.1;cursor:pointer" onclick="editName('${c.id}')" title="Click to edit">${c.name}</div><div style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;cursor:pointer" onclick="editSpecies('${c.id}')" title="Click to edit">${c.species}</div><div style="font-size:13px;color:${c.col};margin-top:5px;font-weight:500;cursor:pointer" onclick="editCls('${c.id}')" title="Click to edit">${c.cls}</div></div><div class="sblk"><div class="blbl">Hit Points</div><div class="hprow"><button class="hpbtn" onclick="aHP('${c.id}',-1)">−</button><div style="display:flex;align-items:baseline;gap:4px;flex:1;justify-content:center"><span class="hpnum" style="color:${hcol}" onclick="sHP('${c.id}')" title="Click to set">${c.hp}</span><span class="hpsep">/</span><span class="hpmax" onclick="editMaxHP('${c.id}')" style="cursor:pointer" title="Click to edit max">${c.hpMax}</span></div><button class="hpbtn" onclick="aHP('${c.id}',1)">+</button></div><div class="tmphp" onclick="sTemp('${c.id}')">${c.hpTemp?"+"+c.hpTemp+" temp HP":"+ Add temp HP"}</div></div><div class="sblk"><div class="blbl">Force Points</div><div style="font-family:var(--fd);font-size:20px;font-weight:700;color:#9b7fe8;line-height:1;margin-bottom:4px">${c.fp} / <span onclick="editMaxFP('${c.id}')" style="cursor:pointer;border-bottom:1px dashed #9b7fe8" title="Click to edit max">${c.fpMax}</span></div><div class="fprow">${fpPips}</div></div><div class="sblk"><div class="blbl">Combat</div><div class="mg"><div class="ms" onclick="editAC('${c.id}')" style="cursor:pointer"><div class="mv">${c.ac}</div><div class="ml">AC</div></div><div class="ms" onclick="editInit('${c.id}')" style="cursor:pointer"><div class="mv">${c.init}</div><div class="ml">Init</div></div><div class="ms" onclick="editSpd('${c.id}')" style="cursor:pointer;grid-column:1/-1"><div class="mv">${c.spd}</div><div class="ml">Speed</div></div></div></div></aside><div class="cm">
+<div class="ctabs">
+  <button class="ctab active" onclick="ctab('${c.id}','stats',this)">Stats</button>
+  <button class="ctab" onclick="ctab('${c.id}','features',this)">Features</button>
+  <button class="ctab" onclick="ctab('${c.id}','combat',this)">Combat</button>
+  <button class="ctab" onclick="ctab('${c.id}','background',this)">Background</button>
+</div>
+<div class="cpane active" id="cp_${c.id}_stats">
+  <div class="sec"><div class="sch"><span class="sct">Ability Scores</span></div><div class="scb"><div class="abg">${abItems}</div></div></div>
+  <div class="sec"><div class="sch"><span class="sct">Saves &amp; Skills</span></div><div class="scb"><div class="ssg">${abGrouped}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:4px"></span>Proficient &nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px"></span>Expertise</div></div></div>
+</div>
+<div class="cpane" id="cp_${c.id}_features">
+  <div class="sec"><div class="sch"><span class="sct">Languages</span><button class="abtn" onclick="addLang('${c.id}')">+ Add</button></div><div class="scb">${buildLangSection(c)}</div></div>
+  <div class="sec"><div class="sch"><span class="sct">Features &amp; Traits</span><button class="abtn" onclick="addFeature('${c.id}')">+ Add feature</button></div><div class="scb" id="feat-scb-${c.id}">${buildFeatSection(c)}</div></div>
+</div>
+<div class="cpane" id="cp_${c.id}_combat">
+  <div class="sec"><div class="sch"><span class="sct">Force Powers</span><button class="abtn" onclick="openPowerPicker('${c.id}')">+ Add power</button></div><div class="scb">${c.powers.length?powersHtml:'<div style="font-size:12px;color:var(--txt3);font-style:italic">No powers known yet.</div>'}</div></div>
+  <div class="sec"><div class="sch"><span class="sct">Weapons</span><button class="abtn" onclick="addWpn('${c.id}')">+ Add weapon</button></div><div class="scb"><table class="wpn"><thead><tr><th>Name</th><th title="Click to roll attack">Attack ↗</th><th title="Click to roll damage">Damage ↗</th><th>Type</th><th>Range</th><th>Notes</th><th></th></tr></thead><tbody>${wpns||"<tr><td colspan='7' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No weapons.</td></tr>"}</tbody></table></div></div>
+  <div class="sec"><div class="sch"><span class="sct">Inventory</span><button class="abtn" onclick="addItem('${c.id}')">+ Add item</button></div><div class="scb"><table class="inv"><thead><tr><th>Item</th><th>Qty</th><th>Wt</th><th>Rarity</th><th>Notes</th><th></th></tr></thead><tbody>${inv||"<tr><td colspan='6' style='color:var(--txt3);font-size:12px;padding:8px 6px'>No items.</td></tr>"}</tbody></table><div class="crrow"><span class="crv" onclick="sCr('${c.id}')" title="Click to edit">${c.credits.toLocaleString()}</span><span class="crl">credits</span></div></div></div>
+</div>
+<div class="cpane" id="cp_${c.id}_background">
+  <div class="sec"><div class="sch"><span class="sct">Background &amp; History</span><button class="abtn" onclick="editBio('${c.id}')" style="color:var(--amber);border-color:var(--ab2)">Edit</button></div><div class="scb"><div class="bio-body" id="bio-${c.id}" onclick="editBio('${c.id}')" title="Click to edit">${c.bio||'<em style="color:var(--txt3)">No background written yet.</em>'}</div></div></div>
+  <div class="sec"><div class="sch"><span class="sct">Relationships &amp; Bonds</span></div><div class="scb"><div>${rels}</div><div style="margin-top:6px;font-family:var(--fm);font-size:9px;color:var(--txt3)">Click pips to adjust bond · 3+ = Bond Boon available</div></div></div>
+</div>
+</div></div>`;
 }
 function rollWpnDmg(id,idx){
   const c=gc(id);const w=c.wpns[idx];
@@ -1047,6 +1231,319 @@ function editFaction(key){
   render();
   if(window.fbPushFaction) window.fbPushFaction();
 }
+// ── Rebel Stronghold System ──────────────────────────────────────────────
+const HQ_TIERS = [
+  {n:"The Camp",   req:0,  desc:"Ships and tents. Functional but fragile."},
+  {n:"The Outpost",req:4,  desc:"Complete 4 of 8 Tier 1 upgrades."},
+  {n:"The Base",   req:5,  desc:"Complete 5 of 9 Tier 2 upgrades."},
+  {n:"The Fortress",req:5, desc:"Complete 5 of 8 Tier 3 upgrades."},
+  {n:"The Stronghold",req:4,desc:"Complete 4 of 6 Tier 4 upgrades."}
+];
+const HQ_UPGRADES = [
+  {id:1,tier:1,n:"Reinforced Perimeter",    cost:"800 cr + 3 Mat",  dc:"DC 13 Technology/Athletics", benefit:"Perimeter Rating 1. Alertness +1 ignored. 1 round warning before assault.",        narrative:"Durasteel fencing, sensor posts, cleared sightlines."},
+  {id:2,tier:1,n:"Barracks",               cost:"600 cr + 4 Mat",  dc:"DC 12 Technology",           benefit:"+1 Hit Die on long rest at base. Morale +5.",                                       narrative:"Proper bunks, lockers, a sabacc-scarred common table."},
+  {id:3,tier:1,n:"Basic Medbay",           cost:"1,000 cr + 5 Mat",dc:"DC 13 Medicine/Technology",  benefit:"Max HP from Hit Dice at base. Stabilized chars conscious in 4 hrs.",               narrative:"Two beds, a bacta tank at 40% efficiency. Smells like antiseptic and hope."},
+  {id:4,tier:1,n:"Secure Comms",           cost:"1,200 cr + 2 Mat + 3 Intel",dc:"DC 14 Technology/Slicing",benefit:"Intercept-proof faction comms. Espionage Intel +2. Secrecy +5.",           narrative:"The antenna array is disguised as agricultural equipment. Mostly convincingly."},
+  {id:5,tier:1,n:"Armory (Basic)",         cost:"1,500 cr + 6 Mat",dc:"DC 13 Technology",           benefit:"Draw standard gear up to 500 cr/mission. Resources +5.",                            narrative:"Racks of weapons. Someone's half-finished modification project on the bench."},
+  {id:6,tier:1,n:"Intelligence Board",     cost:"400 cr + 2 Intel",dc:"DC 12 Investigation",        benefit:"DM reveals 1 piece of intel before each mission. Intel degrades -1/session.",       narrative:"A wall of star charts, photographs, string. Brolin updates it every morning."},
+  {id:7,tier:1,n:"Hangar Bay",             cost:"2,000 cr + 8 Mat",dc:"DC 14 Technology/Piloting",  benefit:"Maintain 4 ships. Repairs half cost. Free 20 HP repair 1/session.",                 narrative:"The smell of fuel. Mahna Tir has labeled her workstation PILOTS ONLY."},
+  {id:8,tier:1,n:"Training Ground",        cost:"700 cr + 3 Mat",  dc:"DC 12 Athletics/Leadership", benefit:"Form Practice & Skill Sharpening DC -2 at base.",                                   narrative:"A sparring circle painted on the duracrete. Trazon runs drills at 0600."},
+  {id:9,tier:2,n:"Advanced Medbay",        cost:"2,500 cr + 8 Mat",dc:"DC 15 Medicine",             benefit:"Full bacta tank. 0 HP → full HP after long rest. Injuries clear in 48 hrs. Req: 03.",narrative:"Clean, bright, stocked. Leona Tai has opinions about the supply cabinet."},
+  {id:10,tier:2,n:"Encrypted Archive",     cost:"2,000 cr + 4 Mat + 6 Intel",dc:"DC 16 Slicing/Lore",benefit:"No Intel degradation. Holocron/Archive DCs -2. +1 FP/long rest for Force users. Req: 04,06.",narrative:"Sylos Mir has left three cryptic annotations nobody can interpret."},
+  {id:11,tier:2,n:"Expanded Armory",       cost:"3,000 cr + 10 Mat",dc:"DC 15 Technology",          benefit:"Gear draw up to 1,500 cr. 1 specialized item/chapter. Weapon Mod +3. Req: 05.",     narrative:"Now three half-finished projects. Trazon's sign hasn't helped."},
+  {id:12,tier:2,n:"Operations Center",     cost:"3,500 cr + 6 Mat + 4 Intel",dc:"DC 16 Technology/Leadership",benefit:"Planning Phase: 3 tactical questions answered pre-mission. Rangers assist 1/chapter. Req: 06.",narrative:"The war room. Brolin's mug never moves. This is where the Rebellion happens."},
+  {id:13,tier:2,n:"Force Sanctuary",       cost:"1,500 cr + 3 Mat + 1 Contact",dc:"DC 14 Force/Lore",benefit:"Force Meditation DC 10. Vision Quest available. Advantage on Force saves at base.",narrative:"Quiet. Warmer than the rest. Kierra is often here before dawn."},
+  {id:14,tier:2,n:"Improved Perimeter",    cost:"2,000 cr + 7 Mat + 4 Intel",dc:"DC 15 Technology", benefit:"Perimeter 2. Alertness +1/+2 absorbed. 2 rounds warning. 20 troopers minimum assault. Req: 01.",narrative:"Overlapping sensor nets, concealed positions, a secondary escape tunnel."},
+  {id:15,tier:2,n:"Recruitment Center",    cost:"1,200 cr + 3 Mat",dc:"DC 14 Leadership/Persuasion",benefit:"Recruit Operatives adds 1d4. 10 named support personnel, 1 may join missions.",    narrative:"A wall of faces. Most are young. Chasid carries that weight."},
+  {id:16,tier:2,n:"Docking Extension",     cost:"3,000 cr + 10 Mat",dc:"DC 15 Technology/Piloting", benefit:"8 ships. Fighter wing (3 X-wings). Mahna: strafing run 6d10 1/mission. Req: 07.",   narrative:"The X-wings in a row. One of the more beautiful things any of them has seen."},
+  {id:17,tier:2,n:"Safe House Registry",   cost:"1,800 cr + 5 Intel",dc:"DC 14 Deception/Persuasion",benefit:"3 safehouses in sector. Long rest benefits if cut off from base. Secrecy +5.",    narrative:"Three addresses memorized, never written down."},
+  {id:18,tier:3,n:"Hardened Bunker",       cost:"5,000 cr + 15 Mat + 6 Intel",dc:"DC 17 Technology", benefit:"Perimeter 3. Alertness ≤3 absorbed. Survives 50-trooper assault 1 session. Req: 14.",narrative:"Reinforced blast doors. It doesn't look like a problem they didn't think about."},
+  {id:19,tier:3,n:"Intelligence Network",  cost:"4,000 cr + 10 Intel",dc:"DC 17 Slicing/Persuasion", benefit:"48hr advance warning of Imperial ops. Inquisitor tracking at disadvantage. Intel +3 all. Req: 10,17.",narrative:"Cassia's contribution is significant. Aelix doesn't know how significant."},
+  {id:20,tier:3,n:"Fleet Coordination Hub",cost:"6,000 cr + 12 Mat",dc:"DC 17 Piloting/Technology",  benefit:"1/chapter: call naval asset (corvette/convoy/decoy). Military +15. Req: 16,12.",    narrative:"There are people on the other end of the comm with bigger ships."},
+  {id:21,tier:3,n:"Jedi Training Hall",    cost:"3,000 cr + 6 Mat + 1 Contact",dc:"DC 15 Force/Leadership",benefit:"1/chapter: attempt new Force power DC 15. Form Practice lasts chapter. Req: 13,08.",narrative:"The practice dummy has been through something. Aelix watches from the doorway."},
+  {id:22,tier:3,n:"Medical Research Wing", cost:"4,500 cr + 10 Mat",dc:"DC 16 Medicine",             benefit:"Synthesize 6 medpacs/stims free/downtime. 1 injury treated/chapter. Req: 09.",      narrative:"Leona Tai reorganized everything. Nobody is allowed to touch it."},
+  {id:23,tier:3,n:"Propaganda Studio",     cost:"2,500 cr + 4 Mat + 3 Intel",dc:"DC 15 Deception/Persuasion",benefit:"Broadcast Truth DC 10. Broadcasts +15 Influence. 1/chapter: +20 Faction roll.",narrative:"THE TRUTH DEPARTMENT, reads the handwritten sign above the door."},
+  {id:24,tier:3,n:"Diplomatic Suite",      cost:"2,000 cr + 3 Mat + 2 Contacts",dc:"DC 14 Persuasion/Insight",benefit:"Safe faction meetings. Bond/Romance DCs -3. Queen Celine visits: +2k cr +10 all stats.",narrative:"Decent furniture. A better drinks cabinet. Cassia suggested the layout."},
+  {id:25,tier:3,n:"Escape Network",        cost:"3,500 cr + 5 Intel + 2 Contacts",dc:"DC 16 Stealth/Persuasion",benefit:"Full evacuation as 1 action. Lose only half Mat. Safehouses → 6. Inquisitor blind 1 session. Req: 17.",narrative:"Aelix designed it. Kierra memorized all of it anyway."},
+  {id:26,tier:4,n:"Command Fortress",      cost:"10,000 cr + 20 Mat + 10 Intel",dc:"DC 18 Technology/Leadership",benefit:"Alliance command node. Military +20. ISD-level assault needed. 1/chapter: Alliance operation. +10 all stats. Req: 18,12.",narrative:"This stopped being a hideout. People look at it differently now."},
+  {id:27,tier:4,n:"The Vault",             cost:"5,000 cr + 8 Mat + 6 Intel",dc:"DC 17 Technology/Slicing",benefit:"Inviolable storage for holocrons/relics. 1/chapter: ask Force 1 question, DM answers honestly.",narrative:"A room only the players can open. What they put in it tells you who they are."},
+  {id:28,tier:4,n:"Alliance Beacon",       cost:"8,000 cr + 10 Mat",dc:"DC 18 Technology",           benefit:"1/chapter: call 2d6 Alliance fighters (1 hr). Influence +20. On Alliance strategic map. Req: 20,04.",narrative:"Somewhere across the galaxy, people hear it and know they are not alone."},
+  {id:29,tier:4,n:"Living Memorial",       cost:"1,000 cr + 2 Mat",dc:"DC 10 (no failure)",           benefit:"Record the fallen. Downtime here: Inspiration + remove 1 exhaustion. Morale +15 permanent.",narrative:"The names. Just the names. Trazon comes here when he thinks no one is watching."},
+  {id:30,tier:4,n:"Vossar Sanctuary",      cost:"4,000 cr + 5 Mat + 2 Contacts",dc:"DC 16 Force/Diplomacy",benefit:"Voska assigned. Knighthood trials available. Force DCs -4. Dark side resistance. Req: 21,13.",narrative:"Voska looks like a man who has been waiting a long time for a room like this."},
+  {id:31,tier:4,n:"The Flame",             cost:"0 cr — cannot be purchased",dc:"Auto-unlock: all Tier 4 done + campaign arc complete",benefit:"1/campaign: invoke The Flame — every allied faction acts simultaneously. The Rebellion's turning point.",narrative:"You didn't set out to build a symbol. This is what that looks like from the outside."},
+];
+const OUTPOST_TYPES = [
+  {t:"Safe House",      cost:"800 cr + 2 Mat",  maint:"100 cr/session",  benefit:"+3 Secrecy in region. Long rest & emergency extraction."},
+  {t:"Intelligence Post",cost:"1,200 cr + 3 Intel",maint:"150 cr/session",benefit:"+3 Intel/session. Advance warning of local Imperial movements."},
+  {t:"Supply Cache",    cost:"1,500 cr + 5 Mat", maint:"200 cr/session",  benefit:"500 cr equipment/mission in region. Resources +5."},
+  {t:"Recruitment Cell",cost:"1,000 cr + 2 Mat", maint:"150 cr/session",  benefit:"Recruit DC -3 in region. +1 Contact attempt/chapter."},
+  {t:"Comm Relay",      cost:"1,800 cr + 4 Mat", maint:"200 cr/session",  benefit:"+2 Intel all sources in region. Inquisitor tracking -2."},
+  {t:"Medical Station", cost:"2,000 cr + 6 Mat", maint:"250 cr/session",  benefit:"Field stabilization: 0 HP chars recover 1d6 HP if they reach station."},
+  {t:"Propaganda Cell", cost:"1,200 cr + 3 Mat", maint:"150 cr/session",  benefit:"Broadcast Truth DC -4 in region. Influence +5 in region."},
+  {t:"Jedi Waypoint",   cost:"1,500 cr + 1 Contact",maint:"100 cr/session",benefit:"Force Meditation without returning to HQ. +1 FP recovery in region."},
+];
+
+let hqData = {
+  name: "The Meserian Cache",
+  tier: 0,
+  upgrades: [],
+  resources: { credits: 2000, intel: 0, materials: 5, matCap: 20 },
+  contacts: [
+    {n:"Naresh",          cap:"Smuggler / intel broker",    status:"active"},
+    {n:"Harloen Rangers", cap:"Military support",           status:"active"},
+    {n:"Virellian Restoration Bloc",cap:"Political cover",  status:"active"}
+  ],
+  outposts: [],
+  alertness: 0
+};
+let hqLoaded = false;
+
+async function loadHQ() {
+  if (hqLoaded) return;
+  if (window.fbGetHQ) {
+    const data = await window.fbGetHQ();
+    if (data) { hqData = data; hqLoaded = true; return; }
+  }
+  hqLoaded = true;
+}
+async function saveHQ() {
+  if (window.fbSaveHQ) await window.fbSaveHQ(hqData);
+}
+
+function toggleUpgrade(id) {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const has = hqData.upgrades.includes(id);
+  if (has) hqData.upgrades = hqData.upgrades.filter(u => u !== id);
+  else hqData.upgrades.push(id);
+  // Recalc tier
+  const tierUpgrades = [null,[1,2,3,4,5,6,7,8],[9,10,11,12,13,14,15,16,17],[18,19,20,21,22,23,24,25],[26,27,28,29,30,31]];
+  let tier = 0;
+  for (let t = 1; t <= 4; t++) {
+    const done = tierUpgrades[t].filter(u => hqData.upgrades.includes(u)).length;
+    if (done >= HQ_TIERS[t].req) tier = t; else break;
+  }
+  hqData.tier = tier;
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function editResource(key) {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const labels = {credits:"Credits (cr)",intel:"Intel",materials:"Materials",matCap:"Materials Storage Cap"};
+  const v = prompt("Set " + labels[key] + ":", hqData.resources[key]);
+  if (v === null) return;
+  hqData.resources[key] = parseInt(v) || 0;
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function editAlertness() {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const v = prompt("Set Imperial Alertness (0–100):", hqData.alertness);
+  if (v === null) return;
+  hqData.alertness = Math.max(0, Math.min(100, parseInt(v) || 0));
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function addOutpost() {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const typeList = OUTPOST_TYPES.map((t,i) => i+1+". "+t.t).join("\n");
+  const pick = prompt("Outpost type:\n" + typeList + "\n\nEnter number:");
+  if (!pick) return;
+  const ot = OUTPOST_TYPES[parseInt(pick)-1];
+  if (!ot) return;
+  const loc = prompt("Location (planet/system):"); if (!loc) return;
+  const contact = prompt("Assigned contact (or blank):") || "";
+  hqData.outposts.push({ id:"op"+Date.now(), type:ot.t, location:loc.trim(), contact:contact.trim(), status:"active" });
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function toggleOutpostStatus(id) {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const op = hqData.outposts.find(o => o.id === id);
+  if (!op) return;
+  const cycle = {active:"dark",dark:"compromised",compromised:"active"};
+  op.status = cycle[op.status] || "active";
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function removeOutpost(id) {
+  if (!confirm("Remove this outpost?")) return;
+  hqData.outposts = hqData.outposts.filter(o => o.id !== id);
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function addContact() {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const n = prompt("Contact name:"); if (!n) return;
+  const cap = prompt("Capability:") || "";
+  hqData.contacts.push({n:n.trim(), cap:cap.trim(), status:"active"});
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function toggleContact(idx) {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const c = hqData.contacts[idx];
+  if (!c) return;
+  const cycle = {active:"cooldown",cooldown:"active"};
+  c.status = cycle[c.status] || "active";
+  saveHQ();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+let hqCollapsed = {1:false,2:true,3:true,4:true};  // tier 1 open by default, rest collapsed
+
+function toggleTier(t) {
+  hqCollapsed[t] = !hqCollapsed[t];
+  // Toggle in-place without full re-render
+  const sec = document.getElementById("hq-tier-" + t);
+  if (sec) {
+    sec.classList.toggle("collapsed", hqCollapsed[t]);
+  }
+}
+window.toggleTier = toggleTier;
+
+function renderStronghold() {
+  const isDM = window.isDM && window.isDM();
+  const r = hqData.resources;
+  const alertCol = hqData.alertness <= 20 ? "var(--green)" : hqData.alertness <= 40 ? "var(--amber)" : hqData.alertness <= 60 ? "#e88a2e" : "var(--red)";
+  const alertLabel = hqData.alertness <= 20 ? "LOW" : hqData.alertness <= 40 ? "ELEVATED" : hqData.alertness <= 60 ? "HIGH" : "CRITICAL";
+
+  // Tier progress
+  const tierUpgrades = [null,[1,2,3,4,5,6,7,8],[9,10,11,12,13,14,15,16,17],[18,19,20,21,22,23,24,25],[26,27,28,29,30,31]];
+  const nextTier = Math.min(hqData.tier + 1, 4);
+  const nextTierUps = tierUpgrades[nextTier] || [];
+  const nextDone = nextTierUps.filter(u => hqData.upgrades.includes(u)).length;
+  const nextReq = HQ_TIERS[nextTier]?.req || 0;
+
+  // Resources row
+  const resHtml = `
+    <div class="hq-resources">
+      <div class="hq-res" onclick="${isDM?"editResource('credits')":""}" ${isDM?"style='cursor:pointer'":""} title="${isDM?"Click to edit":""}">
+        <div class="hq-res-val" style="color:var(--amber)">${r.credits.toLocaleString()}</div>
+        <div class="hq-res-lbl">Credits</div>
+      </div>
+      <div class="hq-res" onclick="${isDM?"editResource('intel')":""}" ${isDM?"style='cursor:pointer'":""}>
+        <div class="hq-res-val" style="color:var(--blue)">${r.intel}</div>
+        <div class="hq-res-lbl">Intel <span style="font-size:8px;color:var(--txt3)">(-2/session)</span></div>
+      </div>
+      <div class="hq-res" onclick="${isDM?"editResource('materials')":""}" ${isDM?"style='cursor:pointer'":""}>
+        <div class="hq-res-val" style="color:var(--green)">${r.materials}<span style="font-size:11px;color:var(--txt3)">/${r.matCap}</span></div>
+        <div class="hq-res-lbl">Materials</div>
+      </div>
+      <div class="hq-res" onclick="${isDM?"editAlertness()":""}" ${isDM?"style='cursor:pointer'":""}>
+        <div class="hq-res-val" style="color:${alertCol}">${hqData.alertness}</div>
+        <div class="hq-res-lbl">Alertness <span style="font-size:8px;color:${alertCol}">${alertLabel}</span></div>
+      </div>
+    </div>`;
+
+  // Tier display
+  const tierHtml = `
+    <div class="hq-tier-row">
+      ${HQ_TIERS.map((t,i) => `<div class="hq-tier-pip${i<=hqData.tier?" active":""}" title="${t.n}: ${t.desc}">${i}</div>`).join("")}
+      <span class="hq-tier-name">${HQ_TIERS[hqData.tier].n}</span>
+      ${hqData.tier < 4 ? `<span class="hq-tier-progress">${nextDone}/${nextReq} toward Tier ${nextTier}</span>` : `<span class="hq-tier-progress" style="color:var(--amber)">MAXIMUM TIER</span>`}
+    </div>`;
+
+  // Upgrades by tier
+  const upgradeRows = [1,2,3,4].map(t => {
+    const ups = HQ_UPGRADES.filter(u => u.tier === t);
+    const tierNames = ["","The Outpost","The Base","The Fortress","The Stronghold"];
+    const done = ups.filter(u => hqData.upgrades.includes(u.id)).length;
+    const rows = ups.map(u => {
+      const checked = hqData.upgrades.includes(u.id);
+      return `<div class="hq-upg${checked?" done":""}" onclick="${isDM?`toggleUpgrade(${u.id})`:""}">
+        <div class="hq-upg-check${checked?" on":""}">${checked?"✓":""}</div>
+        <div class="hq-upg-body">
+          <div class="hq-upg-name">${u.id.toString().padStart(2,"0")} — ${u.n}</div>
+          <div class="hq-upg-cost">${u.cost} · ${u.dc}</div>
+          <div class="hq-upg-benefit">${u.benefit}</div>
+          <div class="hq-upg-narrative">${u.narrative}</div>
+        </div>
+      </div>`;
+    }).join("");
+    const isCollapsed = hqCollapsed[t] !== false;
+    return `<div class="hq-tier-section${isCollapsed?" collapsed":""}" id="hq-tier-${t}">
+      <div class="hq-tier-hdr" onclick="toggleTier(${t})">
+        <span class="hq-tier-label">Tier ${t} — ${tierNames[t]}</span>
+        <span class="hq-tier-count">${done}/${ups.length} complete</span>
+        <span class="hq-tier-chevron">▾</span>
+      </div>
+      <div class="hq-tier-upgrades"><div class="hq-upgrades" style="margin-top:.3rem">${rows}</div></div>
+    </div>`;
+  }).join("");
+
+  // Contacts
+  const contactHtml = hqData.contacts.map((c,i) => `
+    <div class="hq-contact">
+      <div class="hq-contact-dot ${c.status==="active"?"hq-dot-active":"hq-dot-cd"}"></div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:var(--txtb)">${c.n}</div>
+        <div style="font-size:11px;color:var(--txt2)">${c.cap}</div>
+      </div>
+      <span class="hq-contact-status" onclick="${isDM?`toggleContact(${i})`:""}" style="${isDM?"cursor:pointer":""}">
+        ${c.status === "active" ? "Active" : "Cooldown"}
+      </span>
+    </div>`).join("");
+
+  // Outposts
+  const outpostHtml = hqData.outposts.length ? hqData.outposts.map(o => {
+    const scol = {active:"var(--green)",dark:"var(--txt3)",compromised:"var(--red)"}[o.status] || "var(--txt3)";
+    return `<div class="hq-outpost">
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:var(--txtb)">${o.location}</div>
+        <div style="font-size:11px;color:var(--txt2)">${o.type}${o.contact?" · "+o.contact:""}</div>
+      </div>
+      <span style="font-family:var(--fm);font-size:9px;color:${scol};cursor:${isDM?"pointer":"default"};border:1px solid ${scol};border-radius:2px;padding:2px 7px;letter-spacing:.06em" onclick="${isDM?`toggleOutpostStatus('${o.id}')`:""}">${o.status.toUpperCase()}</span>
+      ${isDM?`<button class="dbtn" onclick="removeOutpost('${o.id}')" style="margin-left:4px">×</button>`:""}
+    </div>`;
+  }).join("") : `<div style="font-size:12px;color:var(--txt3);font-style:italic">No outposts established. ${isDM?"Use + Add Outpost to begin.":""}</div>`;
+
+  return `<div class="sec">
+    <div class="sch">
+      <span class="sct">Rebel Stronghold — ${hqData.name}</span>
+      ${isDM?`<button class="abtn" onclick="editResource('credits')" style="color:var(--amber);border-color:var(--ab2)">Edit Resources</button>`:""}
+    </div>
+    <div class="scb">
+      ${resHtml}
+      ${tierHtml}
+      <div class="hq-section-lbl">HQ Upgrades ${isDM?"<span style='font-size:9px;color:var(--txt3)'>(click to toggle)</span>":""}</div>
+      <div class="hq-upgrades">${upgradeRows}</div>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sch">
+      <span class="sct">Contacts</span>
+      ${isDM?`<button class="abtn" onclick="addContact()">+ Add</button>`:""}
+    </div>
+    <div class="scb"><div class="hq-contact-list">${contactHtml}</div></div>
+  </div>
+  <div class="sec">
+    <div class="sch">
+      <span class="sct">Outpost Network</span>
+      ${isDM?`<button class="abtn" style="color:var(--amber);border-color:var(--ab2)" onclick="addOutpost()">+ Add Outpost</button>`:""}
+    </div>
+    <div class="scb"><div class="hq-outpost-list">${outpostHtml}</div></div>
+  </div>`;
+}
+
+window.toggleUpgrade=toggleUpgrade;window.editResource=editResource;window.editAlertness=editAlertness;
+window.addOutpost=addOutpost;window.toggleOutpostStatus=toggleOutpostStatus;window.removeOutpost=removeOutpost;
+window.addContact=addContact;window.toggleContact=toggleContact;
+
 function renderOps(){
   const fsc=Object.entries(FACTION).map(([k,f])=>`<div class="fsc"><div class="fsh"><span class="fsk">${k}</span><span class="fsv" style="color:${f.col};cursor:pointer;border-bottom:1px dashed ${f.col}" onclick="editFaction('${k}')" title="Click to edit">${f.v}</span></div><div class="fsb"><div style="height:100%;border-radius:2px;background:${f.col};width:${Math.min(f.v,100)}%"></div></div><div class="fsd">${f.d}</div></div>`).join("");
   const ds={success:"ss",pending:"sp",fail:"sf"};
@@ -1055,7 +1552,7 @@ function renderOps(){
     return `<div style="margin-bottom:.9rem"><div class="ocl" style="color:${c.col}">${c.name}</div><div class="dtg">${cards}</div></div>`;
   }).join("");
   const evs=EVENTS.map((e,i)=>`<div class="evr" style="border-bottom:${i<EVENTS.length-1?"1px solid var(--bdr)":"none"}"><div class="evs">Sess. ${e.s}</div><div><div class="evt">${e.t}</div><div class="evd">${e.d}</div></div><span class="eve ${e.pos?"ep":"en"}">${e.e}</span></div>`).join("");
-  return `<div class="opspg"><div><div class="pgt">Operations</div><div class="pgs">REBEL CELL — DOWNTIME LOG &amp; FACTION STATUS</div></div><div class="sec"><div class="sch"><span class="sct">Cell Faction Stats</span></div><div class="scb"><div class="fsg">${fsc}</div><div style="margin-top:7px;font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div><div class="sec"><div class="sch"><span class="sct">Downtime Log — Current Arc</span></div><div class="scb">${charDt}</div></div><div class="sec"><div class="sch"><span class="sct">Galactic Event Log</span></div><div class="scb"><div>${evs}</div></div></div></div>`;
+  return `<div class="opspg"><div><div class="pgt">Operations</div><div class="pgs">REBEL CELL — DOWNTIME LOG &amp; FACTION STATUS</div></div><div class="sec"><div class="sch"><span class="sct">Cell Faction Stats</span></div><div class="scb"><div class="fsg">${fsc}</div><div style="margin-top:7px;font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div>${renderStronghold()}<div class="sec"><div class="sch"><span class="sct">Downtime Log — Current Arc</span></div><div class="scb">${charDt}</div></div><div class="sec"><div class="sch"><span class="sct">Galactic Event Log</span></div><div class="scb"><div>${evs}</div></div></div></div>`;
 }
 function toggleShipLock(idx){
   if(!(window.requireDM&&window.requireDM()))return;
@@ -1085,8 +1582,8 @@ function renderShips(){
   return `<div class="shpg"><div style="padding:.9rem 0 .75rem;display:flex;align-items:baseline;gap:12px"><div><div class="pgt">Cell Ships</div><div class="pgs">REBEL ALLIANCE — REGISTERED VESSELS</div></div><span style="font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.1em;margin-left:auto">${unlockedCount}/${SHIPS.length} ACQUIRED${(window.isDM&&window.isDM())?" · CLICK STATUS TO TOGGLE":""}</span></div><div class="shgg">${cards}</div></div>`;
 }
 function shTab(uid,pane,btn){["st","wp","pi"].forEach(p=>{const el=document.getElementById(uid+"_"+p);if(el)el.classList.toggle("active",p===pane)});btn.closest(".shtabs").querySelectorAll(".shtab").forEach(b=>b.classList.remove("active"));btn.classList.add("active")}
-function buildNav(){let h="";chars.forEach(c=>{h+=`<button class="nb${activePg==="char_"+c.id?" active":""}" onclick="showPg('char_${c.id}',this)">${c.name.split(" ")[0]}</button>`});h+=`<div class="ndiv"></div>`;h+=`<button class="nb${activePg==="ops"?" active":""}" onclick="showPg('ops',this)">Operations</button>`;h+=`<button class="nb${activePg==="ships"?" active":""}" onclick="showPg('ships',this)">Ships</button>`;h+=`<button class="nb${activePg==="codex"?" active":""}" onclick="showPg('codex',this)">Codex</button>`;document.getElementById("nav").innerHTML=h}
-function render(){buildNav();let h="";chars.forEach(c=>{h+=`<div class="pg${activePg==="char_"+c.id?" active":""}" id="pg_char_${c.id}">${renderChar(c)}</div>`});h+=`<div class="pg${activePg==="ops"?" active":""}" id="pg_ops">${renderOps()}</div>`;h+=`<div class="pg${activePg==="ships"?" active":""}" id="pg_ships">${renderShips()}</div>`;h+=`<div class="pg${activePg==="codex"?" active":""}" id="pg_codex">${renderCodex()}</div>`;document.getElementById("pages").innerHTML=h}
+function buildNav(){let h="";chars.forEach(c=>{h+=`<button class="nb${activePg==="char_"+c.id?" active":""}" onclick="showPg('char_${c.id}',this)">${c.name.split(" ")[0]}</button>`});h+=`<div class="ndiv"></div>`;h+=`<button class="nb${activePg==="ops"?" active":""}" onclick="showPg('ops',this)">Operations</button>`;h+=`<button class="nb${activePg==="ships"?" active":""}" onclick="showPg('ships',this)">Ships</button>`;h+=`<button class="nb${activePg==="codex"?" active":""}" onclick="showPg('codex',this)">Codex</button>`;h+=`<button class="nb${activePg==="sessions"?" active":""}" onclick="showPg('sessions',this)">Sessions</button>`;document.getElementById("nav").innerHTML=h}
+function render(){buildNav();let h="";chars.forEach(c=>{h+=`<div class="pg${activePg==="char_"+c.id?" active":""}" id="pg_char_${c.id}">${renderChar(c)}</div>`});h+=`<div class="pg${activePg==="ops"?" active":""}" id="pg_ops">${renderOps()}</div>`;h+=`<div class="pg${activePg==="ships"?" active":""}" id="pg_ships">${renderShips()}</div>`;h+=`<div class="pg${activePg==="codex"?" active":""}" id="pg_codex">${renderCodex()}</div>`;h+=`<div class="pg${activePg==="sessions"?" active":""}" id="pg_sessions">${renderSessions()}</div>`;document.getElementById("pages").innerHTML=h}
 function showPg(id,btn){activePg=id;document.querySelectorAll(".nb").forEach(b=>b.classList.remove("active"));document.querySelectorAll(".pg").forEach(p=>p.classList.remove("active"));const pg=document.getElementById("pg_"+id);if(pg)pg.classList.add("active");btn.classList.add("active")}
 function aHP(id,d){upd(id,c=>{c.hp=Math.max(0,Math.min(c.hpMax,c.hp+d))})}
 function sHP(id){const c=gc(id);const v=prompt("Set HP (max "+c.hpMax+"):",c.hp);if(v!==null)upd(id,c=>{c.hp=Math.max(0,Math.min(c.hpMax,parseInt(v)||0))})}
@@ -1542,6 +2039,126 @@ function deleteCodexEntry(type,id){
   render();
 }
 
+// ── Session Notes ─────────────────────────────────────────────────────────
+let sessionData = {
+  story: "",
+  sessions: []
+};
+let sessionsLoaded = false;
+
+async function loadSessions() {
+  if (sessionsLoaded) return;
+  if (window.fbGetSessions) {
+    const data = await window.fbGetSessions();
+    if (data) { sessionData = data; sessionsLoaded = true; return; }
+  }
+  sessionsLoaded = true;
+}
+
+async function saveSessions() {
+  if (window.fbSaveSessions) await window.fbSaveSessions(sessionData);
+}
+
+function renderSessions() {
+  const isDM = window.isDM && window.isDM();
+  const storyHtml = `
+    <div class="sn-story">
+      <div class="sn-story-hdr">
+        <span class="sn-story-title">⚡ The Story So Far</span>
+        ${isDM ? `<button class="abtn" onclick="editStory()">Edit</button>` : ""}
+      </div>
+      <div class="sn-story-body" ${isDM ? 'onclick="editStory()" title="Click to edit"' : ""}>
+        ${sessionData.story || '<em>No story summary written yet.</em>'}
+      </div>
+    </div>`;
+
+  const sessions = [...sessionData.sessions].sort((a,b) => b.num - a.num);
+  const sessionCards = sessions.length ? sessions.map(s => `
+    <div class="sn-session" id="sn_${s.id}">
+      <div class="sn-session-hdr" onclick="toggleSession('${s.id}')">
+        <span class="sn-session-num">#${s.num}</span>
+        <span class="sn-session-title">${s.title || "Untitled Session"}</span>
+        <span class="sn-session-date">${s.date || ""}</span>
+        <span class="sn-session-chevron">▾</span>
+      </div>
+      <div class="sn-session-body">
+        ${s.summary || '<em style="color:var(--txt3)">No summary written.</em>'}
+        ${isDM ? `<div class="sn-session-actions">
+          <button class="abtn" onclick="editSession('${s.id}')">Edit</button>
+          <button class="abtn" style="color:var(--red)" onclick="deleteSession('${s.id}')">Delete</button>
+        </div>` : ""}
+      </div>
+    </div>`).join("") : `<div class="sn-empty">No sessions logged yet. Add the first one above.</div>`;
+
+  return `<div class="sn-wrap">
+    ${storyHtml}
+    <div class="sn-list-hdr">
+      <span class="sn-list-title">Session Log — ${sessions.length} session${sessions.length!==1?"s":""}</span>
+      ${isDM ? `<button class="abtn" style="color:var(--amber);border-color:var(--ab2)" onclick="addSession()">+ Add session</button>` : ""}
+    </div>
+    ${sessionCards}
+  </div>`;
+}
+
+function toggleSession(id) {
+  document.getElementById("sn_" + id)?.classList.toggle("open");
+}
+
+function editStory() {
+  if (!window.requireAuth || !window.requireAuth()) return;
+  const v = prompt("The Story So Far — (press Enter for new paragraphs):", sessionData.story || "");
+  if (v === null) return;
+  sessionData.story = v;
+  saveSessions();
+  const pg = document.getElementById("pg_sessions");
+  if (pg) pg.innerHTML = renderSessions();
+}
+
+function addSession() {
+  if (!window.requireAuth || !window.requireAuth()) return;
+  const num = (sessionData.sessions.length ? Math.max(...sessionData.sessions.map(s=>s.num)) + 1 : 1);
+  const title = prompt("Session title:", "Session " + num);
+  if (!title) return;
+  const date = prompt("Date (e.g. 28 Jun 2026):", new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}));
+  const summary = prompt("Session summary:", "");
+  const id = "s" + Date.now();
+  sessionData.sessions.push({ id, num, title: title.trim(), date: (date||"").trim(), summary: (summary||"").trim() });
+  saveSessions();
+  const pg = document.getElementById("pg_sessions");
+  if (pg) pg.innerHTML = renderSessions();
+}
+
+function editSession(id) {
+  if (!window.requireAuth || !window.requireAuth()) return;
+  const idx = sessionData.sessions.findIndex(s => s.id === id);
+  if (idx < 0) return;
+  const s = sessionData.sessions[idx];
+  const title = prompt("Session title:", s.title);
+  if (title === null) return;
+  const date = prompt("Date:", s.date);
+  if (date === null) return;
+  const summary = prompt("Session summary:", s.summary);
+  if (summary === null) return;
+  sessionData.sessions[idx] = { ...s, title: title.trim(), date: date.trim(), summary: summary.trim() };
+  saveSessions();
+  const pg = document.getElementById("pg_sessions");
+  if (pg) pg.innerHTML = renderSessions();
+}
+
+function deleteSession(id) {
+  if (!confirm("Delete this session entry?")) return;
+  sessionData.sessions = sessionData.sessions.filter(s => s.id !== id);
+  saveSessions();
+  const pg = document.getElementById("pg_sessions");
+  if (pg) pg.innerHTML = renderSessions();
+}
+
+window.editStory = editStory;
+window.addSession = addSession;
+window.editSession = editSession;
+window.deleteSession = deleteSession;
+window.toggleSession = toggleSession;
+
 function renderCodex(){
   const isDM=window.isDM&&window.isDM();
   const q=codexSearch.toLowerCase();
@@ -1896,6 +2513,117 @@ function usePower(id, idx){
   if(rollHistory.length>10)rollHistory.pop();
   renderHistory();
 }
+// Character sheet inner tab switcher
+function ctab(cid,pane,btn){
+  ["stats","features","combat","background"].forEach(p=>{
+    const el=document.getElementById("cp_"+cid+"_"+p);
+    if(el)el.classList.toggle("active",p===pane);
+  });
+  btn.closest(".ctabs").querySelectorAll(".ctab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+}
+window.ctab=ctab;
+
+// Feature management
+// ── Feature filter helpers ──────────────────────────────────────────────
+function featFilterCategory(src){
+  if(!src)return"other";
+  const s=src.toLowerCase();
+  // Species: "Species — X" pattern
+  if(s.startsWith("species"))return"species";
+  // Exploits / Practices are sub-features of a class
+  if(s.includes("exploit")||s.includes("practice")||s.includes("feat"))return"other";
+  // Anything with a class name + level number
+  if(/\d/.test(s))return"class";
+  return"other";
+}
+
+function buildFeatSection(c){
+  if(!c.features||!c.features.length)
+    return'<div style="font-size:12px;color:var(--txt3);font-style:italic">No features added yet. Use + Add feature.</div>';
+
+  // Build unique filter options from actual sources
+  const cats=["all","species","class","other"];
+  const catLabels={all:"All",species:"Species",class:"Class",other:"Other"};
+  // Only show tabs that have at least one feature
+  const present=new Set(c.features.map(f=>featFilterCategory(f.s)));
+  const activeCats=cats.filter(cat=>cat==="all"||present.has(cat));
+
+  const filterId="ff_"+c.id;
+  const filterBtns=activeCats.map((cat,i)=>
+    `<button class="feat-filter${i===0?" active":""}" id="${filterId}_${cat}" onclick="filterFeats('${c.id}','${cat}',this)">${catLabels[cat]}</button>`
+  ).join("");
+
+  const cards=c.features.map((f,i)=>{
+    const cat=featFilterCategory(f.s);
+    return `<div class="feat-card" data-feat-cat="${cat}"><div class="feat-card-hdr"><span class="feat-name">${f.n}</span>${f.s?`<span class="feat-src">${f.s}</span>`:""}<button class="dbtn" onclick="editFeature('${c.id}',${i})" title="Edit" style="color:var(--txt3);margin-left:2px">✎</button><button class="dbtn" onclick="delFeature('${c.id}',${i})" title="Remove">×</button></div>${f.d?`<div class="feat-desc">${f.d}</div>`:""}</div>`;
+  }).join("");
+
+  return `<div class="feat-filters">${filterBtns}</div><div class="feat-list" id="fl_${c.id}">${cards}</div>`;
+}
+
+function filterFeats(cid,cat,btn){
+  // Update active button
+  btn.closest(".feat-filters").querySelectorAll(".feat-filter").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  // Show/hide cards
+  const list=document.getElementById("fl_"+cid);
+  if(!list)return;
+  list.querySelectorAll(".feat-card").forEach(card=>{
+    const match=cat==="all"||card.dataset.featCat===cat;
+    card.style.display=match?"":"none";
+  });
+}
+function buildLangSection(c){
+  const langs=c.langs||[];
+  if(!langs.length) return '<div style="font-size:12px;color:var(--txt3);font-style:italic">No languages recorded. Use + Add to add one.</div>';
+  const pills=langs.map((l,i)=>`<div class="lang-pill"><span>${l.n}</span>${l.note?`<span class="lang-pill-note">${l.note}</span>`:""}<button class="dbtn" onclick="editLang('${c.id}',${i})" title="Edit" style="color:var(--txt3)">✎</button><button class="dbtn" onclick="delLang('${c.id}',${i})" title="Remove">×</button></div>`).join("");
+  return `<div class="lang-grid">${pills}</div>`;
+}
+function addLang(id){
+  const n=prompt("Language name:");if(!n||!n.trim())return;
+  const note=prompt("Proficiency note (e.g. Speak, read, write — or leave blank):")||"";
+  upd(id,c=>{if(!c.langs)c.langs=[];c.langs.push({n:n.trim(),note:note.trim()});});
+}
+function editLang(id,idx){
+  const c=gc(id);const l=c.langs[idx];if(!l)return;
+  const n=prompt("Language name:",l.n);if(n===null)return;
+  const note=prompt("Proficiency note:",l.note);if(note===null)return;
+  upd(id,c=>{c.langs[idx]={n:n.trim(),note:note.trim()};});
+}
+function delLang(id,idx){
+  if(!confirm("Remove this language?"))return;
+  upd(id,c=>{c.langs.splice(idx,1);});
+}
+window.buildLangSection=buildLangSection;
+window.addLang=addLang;window.editLang=editLang;window.delLang=delLang;
+window.buildFeatSection=buildFeatSection;
+window.filterFeats=filterFeats;
+
+function addFeature(id){
+  const name=prompt("Feature name (e.g. Force Empathy, Jedi Sentinel):");
+  if(!name||!name.trim())return;
+  const src=prompt("Source (e.g. Guardian 3, Species, Feat):")||"";
+  const desc=prompt("Description:")||"";
+  upd(id,c=>{
+    if(!c.features)c.features=[];
+    c.features.push({n:name.trim(),s:src.trim(),d:desc.trim()});
+  });
+}
+function editFeature(id,idx){
+  const c=gc(id);
+  const f=c.features[idx];
+  if(!f)return;
+  const name=prompt("Feature name:",f.n);if(name===null)return;
+  const src=prompt("Source:",f.s);if(src===null)return;
+  const desc=prompt("Description:",f.d);if(desc===null)return;
+  upd(id,c=>{c.features[idx]={n:name.trim(),s:src.trim(),d:desc.trim()};});
+}
+function delFeature(id,idx){
+  if(!confirm("Remove this feature?"))return;
+  upd(id,c=>{c.features.splice(idx,1);});
+}
+window.addFeature=addFeature;window.editFeature=editFeature;window.delFeature=delFeature;
 window.usePower=usePower;
 window.openPowerPicker=openPowerPicker;
 window.closePowerPicker=closePowerPicker;
@@ -1984,7 +2712,7 @@ const VILLAIN_DEFAULTS=[
    rels:"Answers to Darth Vader. Operating independently of local Moff authority — a fact that creates friction with Imperial command in the sector.",relsSecret:"She has identified at least one of the party as Force-sensitive. She is not rushing. She is building a complete picture before she moves.",relsRevealed:false}
 ];
 
-loadCodex().then(()=>render());
+Promise.all([loadCodex(), loadSessions(), loadHQ()]).then(()=>render());
 
 // Init adv row visibility
 document.getElementById("advrow").style.display="flex";
