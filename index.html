@@ -131,6 +131,20 @@ window.fbSaveCodex = async function(data) {
   catch(e) { console.warn("Codex save error", e); }
 };
 
+// Intel threads Firestore sync
+window.fbGetIntel = async function() {
+  try {
+    const snap = await getDoc(doc(db, "campaign", "intel"));
+    if (snap.exists()) return snap.data();
+  } catch(e) { console.warn("Intel load error", e); }
+  return null;
+};
+window.fbSaveIntel = async function(data) {
+  if (!currentUser) return;
+  try { await setDoc(doc(db, "campaign", "intel"), data, { merge: false }); }
+  catch(e) { console.warn("Intel save error", e); }
+};
+
 // HQ / Stronghold Firestore sync
 window.fbGetHQ = async function() {
   try {
@@ -434,7 +448,22 @@ table.wpn tr:last-child td{border-bottom:none}
 .noteh{font-family:var(--fm);font-size:9px;color:var(--txt3);margin-top:3px;letter-spacing:.08em}
 .bio-body{font-size:13px;color:var(--txt);line-height:1.7;min-height:80px;cursor:pointer;border-radius:3px;padding:4px 2px;transition:background .15s;white-space:pre-wrap}
 .bio-body:hover{background:var(--s2)}
-.opspg{padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1.1rem;max-width:1100px}
+.opspg{padding:0;display:flex;flex-direction:column;max-width:1100px}
+.ops-hdr{padding:1.25rem 1.5rem .75rem}
+.ops-content{padding:0 1.5rem 1.5rem;display:flex;flex-direction:column;gap:1.1rem}
+/* Intel section */
+.intel-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem}
+.intel-card{background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:8px 10px}
+.intel-card-val{font-family:var(--fd);font-size:20px;font-weight:700;color:var(--blue);line-height:1.1;cursor:pointer;border-bottom:1px dashed rgba(91,155,213,.4)}
+.intel-card-lbl{font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-top:3px}
+.intel-threads{display:flex;flex-direction:column;gap:.35rem}
+.intel-thread{background:var(--s2);border:1px solid var(--bdr2);border-left:3px solid var(--blue);border-radius:0 3px 3px 0;padding:7px 10px;display:flex;align-items:flex-start;gap:8px}
+.intel-thread-body{flex:1}
+.intel-thread-title{font-size:12px;font-weight:600;color:var(--txtb);margin-bottom:2px}
+.intel-thread-detail{font-size:11px;color:var(--txt2);line-height:1.45}
+.intel-thread-src{font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.06em;margin-top:3px}
+.intel-thread.hot{border-left-color:var(--amber)}
+.intel-thread.stale{opacity:.55;border-left-color:var(--bdr2)}
 /* Rebel Stronghold System */
 .hq-resources{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.85rem}
 .hq-res{background:var(--s2);border:1px solid var(--bdr2);border-radius:3px;padding:8px 10px;text-align:center}
@@ -1544,6 +1573,81 @@ window.toggleUpgrade=toggleUpgrade;window.editResource=editResource;window.editA
 window.addOutpost=addOutpost;window.toggleOutpostStatus=toggleOutpostStatus;window.removeOutpost=removeOutpost;
 window.addContact=addContact;window.toggleContact=toggleContact;
 
+// ── Intel Threads ──────────────────────────────────────────────────────────
+let intelData = {
+  threads: [
+    {id:"it1", title:"ISB Listening Post — Harloen Sector", detail:"Destroyed during the defection op. Replacement post confirmed under construction 40 km NW. Expected operational within 2 sessions.", source:"Rangers intel / Session 1", status:"hot"},
+    {id:"it2", title:"Crymorah Syndicate — Imperial Contract", detail:"Confirmed labour supply agreement with Imperial Engineering Corps. Depot on Ryndal IV identified as primary processing site. Naresh tracking shipment schedules.", source:"Tebo Station debrief / Session 1", status:"active"},
+    {id:"it3", title:"Ossus Star Map — Fragment 1", detail:"Decoded from Master Varo Xel holocron. Points to a dead moon in the Chorlian Drift. Vossar Jedi confirming route safety. Inquisitor interest suspected.", source:"Prison Barge debrief / Session 2", status:"hot"},
+    {id:"it4", title:"Public Order Decree 746-22", detail:"Full text obtained via Senator Allendor. Trial waivers authorized by Regional Governors. Rendition-class barges confirmed operating in sector. Three additional barges suspected.", source:"War room briefing / Session 2", status:"active"},
+  ]
+};
+let intelLoaded = false;
+
+async function loadIntel() {
+  if (intelLoaded) return;
+  if (window.fbGetIntel) {
+    const data = await window.fbGetIntel();
+    if (data) { intelData = data; intelLoaded = true; return; }
+  }
+  intelLoaded = true;
+}
+async function saveIntel() {
+  if (window.fbSaveIntel) await window.fbSaveIntel(intelData);
+}
+
+function addIntelThread() {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const title = prompt("Intel thread title:"); if (!title) return;
+  const detail = prompt("Details / what is known:") || "";
+  const source = prompt("Source (mission / session / contact):") || "";
+  const status = prompt("Status (active / hot / stale):", "active") || "active";
+  intelData.threads.push({id:"it"+Date.now(), title:title.trim(), detail:detail.trim(), source:source.trim(), status:status.trim()});
+  saveIntel();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function editIntelThread(id) {
+  if (!(window.requireAuth && window.requireAuth())) return;
+  const idx = intelData.threads.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  const t = intelData.threads[idx];
+  const title = prompt("Title:", t.title); if (title === null) return;
+  const detail = prompt("Details:", t.detail); if (detail === null) return;
+  const source = prompt("Source:", t.source); if (source === null) return;
+  const status = prompt("Status (active / hot / stale):", t.status); if (status === null) return;
+  intelData.threads[idx] = {...t, title:title.trim(), detail:detail.trim(), source:source.trim(), status:status.trim()};
+  saveIntel();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+function deleteIntelThread(id) {
+  if (!confirm("Remove this intel thread?")) return;
+  intelData.threads = intelData.threads.filter(t => t.id !== id);
+  saveIntel();
+  const pg = document.getElementById("pg_ops");
+  if (pg) pg.innerHTML = renderOps();
+}
+
+window.addIntelThread = addIntelThread;
+window.editIntelThread = editIntelThread;
+window.deleteIntelThread = deleteIntelThread;
+
+let opsPaneActive = "cell";
+
+function switchOpsPane(pane, btn) {
+  opsPaneActive = pane;
+  ["cell","intel"].forEach(p => {
+    const el = document.getElementById("ops_pane_" + p);
+    if (el) el.classList.toggle("active", p === pane);
+  });
+  btn.closest(".ctabs").querySelectorAll(".ctab").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+window.switchOpsPane = switchOpsPane;
+
 function renderOps(){
   const fsc=Object.entries(FACTION).map(([k,f])=>`<div class="fsc"><div class="fsh"><span class="fsk">${k}</span><span class="fsv" style="color:${f.col};cursor:pointer;border-bottom:1px dashed ${f.col}" onclick="editFaction('${k}')" title="Click to edit">${f.v}</span></div><div class="fsb"><div style="height:100%;border-radius:2px;background:${f.col};width:${Math.min(f.v,100)}%"></div></div><div class="fsd">${f.d}</div></div>`).join("");
   const ds={success:"ss",pending:"sp",fail:"sf"};
@@ -1552,7 +1656,50 @@ function renderOps(){
     return `<div style="margin-bottom:.9rem"><div class="ocl" style="color:${c.col}">${c.name}</div><div class="dtg">${cards}</div></div>`;
   }).join("");
   const evs=EVENTS.map((e,i)=>`<div class="evr" style="border-bottom:${i<EVENTS.length-1?"1px solid var(--bdr)":"none"}"><div class="evs">Sess. ${e.s}</div><div><div class="evt">${e.t}</div><div class="evd">${e.d}</div></div><span class="eve ${e.pos?"ep":"en"}">${e.e}</span></div>`).join("");
-  return `<div class="opspg"><div><div class="pgt">Operations</div><div class="pgs">REBEL CELL — DOWNTIME LOG &amp; FACTION STATUS</div></div><div class="sec"><div class="sch"><span class="sct">Cell Faction Stats</span></div><div class="scb"><div class="fsg">${fsc}</div><div style="margin-top:7px;font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div>${renderStronghold()}<div class="sec"><div class="sch"><span class="sct">Downtime Log — Current Arc</span></div><div class="scb">${charDt}</div></div><div class="sec"><div class="sch"><span class="sct">Galactic Event Log</span></div><div class="scb"><div>${evs}</div></div></div></div>`;
+  const isDM = window.isDM && window.isDM();
+  // ── Intel pane content ──
+  const intelStatHtml = `<div class="intel-grid">
+    <div class="intel-card"><div class="intel-card-val" onclick="${isDM?"editResource('intel')":""}" title="Current intel pool">${hqData.resources.intel}</div><div class="intel-card-lbl">Intel Pool</div></div>
+    <div class="intel-card"><div class="intel-card-val" style="color:var(--txt3)">-2</div><div class="intel-card-lbl">Degradation / Session</div></div>
+    <div class="intel-card"><div class="intel-card-val" style="color:${hqData.upgrades.includes(10)?"var(--green)":"var(--red)"}">${hqData.upgrades.includes(10)?"Active":"Inactive"}</div><div class="intel-card-lbl">Encrypted Archive</div></div>
+  </div>`;
+  const statusLabel = {active:"ACTIVE",hot:"HOT",stale:"STALE"};
+  const threadCards = intelData.threads.map(t => `
+    <div class="intel-thread ${t.status}">
+      <div class="intel-thread-body">
+        <div class="intel-thread-title">${t.title}</div>
+        <div class="intel-thread-detail">${t.detail}</div>
+        <div class="intel-thread-src">${t.source}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
+        <span style="font-family:var(--fm);font-size:8px;letter-spacing:.1em;color:${t.status==="hot"?"var(--amber)":t.status==="stale"?"var(--txt3)":"var(--blue)"};border:1px solid ${t.status==="hot"?"var(--ab2)":t.status==="stale"?"var(--bdr)":"rgba(91,155,213,.35)"};padding:2px 5px;border-radius:2px">${statusLabel[t.status]||t.status.toUpperCase()}</span>
+        ${isDM?`<button class="abtn" onclick="editIntelThread('${t.id}')" style="font-size:9px">Edit</button>
+        <button class="dbtn" onclick="deleteIntelThread('${t.id}')">×</button>`:""}
+      </div>
+    </div>`).join("");
+
+  return `<div class="opspg">
+  <div class="ops-hdr">
+    <div class="pgt">Operations</div>
+    <div class="pgs">REBEL CELL — MESERIAN CACHE</div>
+  </div>
+  <div class="ctabs" style="padding:0 1.5rem">
+    <button class="ctab${opsPaneActive==="cell"?" active":""}" onclick="switchOpsPane('cell',this)">Cell</button>
+    <button class="ctab${opsPaneActive==="intel"?" active":""}" onclick="switchOpsPane('intel',this)">Intel</button>
+  </div>
+  <div class="cpane ops-content${opsPaneActive==="cell"?" active":""}" id="ops_pane_cell">
+    <div class="sec"><div class="sch"><span class="sct">Faction Stats</span></div><div class="scb"><div class="fsg">${fsc}</div><div style="margin-top:7px;font-family:var(--fm);font-size:9px;color:var(--txt3);letter-spacing:.08em">+1 IMPERIAL ALERTNESS PER SESSION · SYNDICATE INTEL AT GM DISCRETION</div></div></div>
+    ${renderStronghold()}
+    <div class="sec"><div class="sch"><span class="sct">Downtime Log — Current Arc</span></div><div class="scb">${charDt}</div></div>
+  </div>
+  <div class="cpane ops-content${opsPaneActive==="intel"?" active":""}" id="ops_pane_intel">
+    <div class="sec">
+      <div class="sch"><span class="sct">Intel</span>${isDM?`<button class="abtn" style="color:var(--blue);border-color:rgba(91,155,213,.35)" onclick="addIntelThread()">+ Add thread</button>`:""}</div>
+      <div class="scb">${intelStatHtml}<div class="intel-threads">${threadCards||'<div style="font-size:12px;color:var(--txt3);font-style:italic">No active intel threads.</div>'}</div></div>
+    </div>
+    <div class="sec"><div class="sch"><span class="sct">Galactic Event Log</span></div><div class="scb"><div>${evs}</div></div></div>
+  </div>
+</div>`;
 }
 function toggleShipLock(idx){
   if(!(window.requireDM&&window.requireDM()))return;
@@ -2712,7 +2859,7 @@ const VILLAIN_DEFAULTS=[
    rels:"Answers to Darth Vader. Operating independently of local Moff authority — a fact that creates friction with Imperial command in the sector.",relsSecret:"She has identified at least one of the party as Force-sensitive. She is not rushing. She is building a complete picture before she moves.",relsRevealed:false}
 ];
 
-Promise.all([loadCodex(), loadSessions(), loadHQ()]).then(()=>render());
+Promise.all([loadCodex(), loadSessions(), loadHQ(), loadIntel()]).then(()=>render());
 
 // Init adv row visibility
 document.getElementById("advrow").style.display="flex";
