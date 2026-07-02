@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cell Registry — SW5e</title>
+<title>Virellian Database — SW5e</title>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -713,7 +713,7 @@ table.wpn tr:last-child td{border-bottom:none}
 <header class="hdr">
   <div>
     <div class="brand-eye">SW5e — OT Era Campaign</div>
-    <div class="brand-name">Cell Registry</div>
+    <div class="brand-name">Virellian Database</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div><span class="dot"></span><span class="stxt" id="syncstatus">CONNECTING...</span></div>
@@ -1681,7 +1681,7 @@ function renderOps(){
   return `<div class="opspg">
   <div class="ops-hdr">
     <div class="pgt">Operations</div>
-    <div class="pgs">REBEL CELL — MESERIAN CACHE</div>
+    <div class="pgs">VIRELLIAN REBELS — MESERIAN BASE</div>
   </div>
   <div class="ctabs" style="padding:0 1.5rem">
     <button class="ctab${opsPaneActive==="cell"?" active":""}" onclick="switchOpsPane('cell',this)">Cell</button>
@@ -1896,11 +1896,16 @@ let codexLoaded=false;
 
 const CODEX_DEFAULTS={
   npcs:[
-    {id:"npc1",name:"Knight Aelix",affiliation:"Vossar Jedi",rank:"Knight",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Aelix%20Kinhar.jpg",hidden:false,
+    {id:"npc1",name:"Aelix Kinhar",affiliation:"Vossar Jedi",rank:"Knight",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Aelix%20Kinhar.jpg",hidden:false,
      location:"Secret Temple / Mobile",locationSecret:"Currently coordinating between the Vossar Temple and Virellian space. Movements tracked only by Voska.",locationRevealed:false,
-     description:"Field commander and primary Jedi contact for the rebel cell. Tall, lean, a vibroblade scar along his jaw he has never had treated. Warm when he lets himself be. In a crisis, the stillest person in the room.",descriptionSecret:"Carries survivor's guilt from Jabiim — a months-long campaign where he lost nearly everyone, including his master. His warmth masks a deep fear of losing someone else.",descriptionRevealed:false,
-     history:"Raised in the Vossar Order from a young age, trained by a Vossar Knight outside the Temple and the High Council's orthodoxy. Fought in the Clone Wars embedded with planetary defence forces across the Outer Rim — training local militias, fighting alongside volunteer units, treating local troops as people rather than assets. Saw action in several major engagements as the war escalated. Jabiim was the last and worst — a grinding months-long campaign that cost him nearly his entire cohort and his master.",historySecret:"His master died in the late stages of Jabiim. Aelix and Paliz, then Padawans, were among the only survivors. The Vossar Council later ruled their survival constituted their Knighthood trials. Neither has ever said whether that helped.",historyRevealed:false,
-     rels:"Close bond with the party. Mentor figure to Kierra. Quietly and privately together with Senator Allendor.",relsSecret:"He and Cassia have been together for some time, kept private out of necessity — a Jedi operative and an Imperial Senator cannot afford to be publicly connected. She is one of three people who knows everything about Jabiim. Paliz and Kierra know about the relationship. No one else does.",relsRevealed:false},
+     description:"Field commander and primary Jedi contact for the rebel cell. Tall, lean, a vibroblade scar along his jaw he has never had treated. Warm when he lets himself be. In a crisis, the stillest person in the room.",descriptionSecret:"Carries survivor's guilt from a campaign that cost him nearly everyone he fought alongside, including his master. His warmth masks a deep fear of losing someone else.",descriptionRevealed:false,
+     history:"Raised in the Vossar Order from a young age, trained by a Vossar Knight outside the Temple and the High Council's orthodoxy. Fought in the Clone Wars embedded with planetary defence forces across the Outer Rim — training local militias, fighting alongside volunteer units, treating local troops as people rather than assets. Saw action in several major engagements as the war escalated.",historySecret:"Jabiim was the last and worst campaign — months of grinding attrition, failed Republic support, and mounting losses. His master died in the final stages. Aelix and Paliz, then Padawans, were among the only survivors. The Vossar Council later ruled their survival constituted their Knighthood trials. Neither has ever said whether that helped.",historyRevealed:false,
+     rels:"<ul style='margin:0;padding-left:1.2em'><li>Close bond with the party — believed in them before they earned it</li><li>Kierra — Mentor and master who pushes her harder than the others</li><li>Naylen Paliz — Co-master of a band of Padawans with Aelix; reached Knighthood at the same time</li></ul>",relsSecret:"<ul style='margin:0;padding-left:1.2em'><li>Quietly together with Cassia Allendor — kept private out of necessity; a Jedi operative and an Imperial Senator cannot afford to be publicly connected</li><li>Cassia is one of three people who knows the full truth of Jabiim</li><li>Paliz and Kierra know about the relationship — no one else does</li></ul>",relsRevealed:false},
+    {id:"npc1b",name:"Naylen Paliz",affiliation:"Vossar Jedi",rank:"Knight",status:"alive",portrait:"",hidden:false,
+     location:"Secret Temple",locationSecret:"",locationRevealed:false,
+     description:"Vossar Jedi Knight. Co-master alongside Aelix Kinhar of a band of Padawans.",descriptionSecret:"",descriptionRevealed:false,
+     history:"Trained as a Padawan in the Vossar Order alongside Aelix Kinhar. Reached Knighthood at the same time as Aelix.",historySecret:"",historyRevealed:false,
+     rels:"",relsSecret:"",relsRevealed:false},
     {id:"npc2",name:"Master Taryn Voska",affiliation:"Vossar Jedi — Founder",rank:"Master",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Taryn%20Voska.jpeg",hidden:false,
      location:"Secret Temple",locationSecret:"The Temple location is known only to Vossar members and the party.",locationRevealed:false,
      description:"Philosophical leader and founder of the Vossar Jedi. Older, thoughtful, warm but carrying the weight of a fractured galaxy.",descriptionSecret:"Voska is dying. A slow Force illness — rare, quiet, and irreversible. He has perhaps one year. Only Leona Tai knows.",descriptionRevealed:false,
