@@ -1890,57 +1890,58 @@ function rollCustom(){
 // ── Codex ─────────────────────────────────────────────────────────────────
 let codexData={npcs:[],planets:[],orgs:[]};
 let codexTab="npcs";
+let npcFilter="all";
 let codexSearch="";
 let codexLoaded=false;
 
 const CODEX_DEFAULTS={
   npcs:[
-    {id:"npc1",name:"Knight Aelix",affiliation:"Vossar Jedi",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Aelix%20Kinhar.jpg",hidden:false,
+    {id:"npc1",name:"Knight Aelix",affiliation:"Vossar Jedi",rank:"Knight",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Aelix%20Kinhar.jpg",hidden:false,
      location:"Secret Temple / Mobile",locationSecret:"Currently coordinating between the Vossar Temple and Virellian space. Movements tracked only by Voska.",locationRevealed:false,
-     description:"Field commander and primary Jedi contact for the rebel cell. Capable and warm beneath the surface.",descriptionSecret:"Carries significant personal guilt over survivors he failed to protect during Order 66. His warmth masks a deep fear of failure.",descriptionRevealed:false,
-     history:"A Vossar Knight who reached out to recruit the party. Led the briefing at the Rancor's Roost and introduced the party to Master Voska.",historySecret:"Was a Jedi Temple initiate during Order 66. Survived only because Voska pulled him out weeks before. Has never spoken of what he saw.",historyRevealed:false,
-     rels:"Close bond with the party. Mentor figure to Kierra.",relsSecret:"His personal connection to Senator Allendor predates the Rebellion. They were friends before the Empire. The nature of that bond is unspoken but visible to anyone paying attention.",relsRevealed:false},
-    {id:"npc2",name:"Master Taryn Voska",affiliation:"Vossar Jedi — Founder",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Taryn%20Voska.jpeg",hidden:false,
+     description:"Field commander and primary Jedi contact for the rebel cell. Tall, lean, a vibroblade scar along his jaw he has never had treated. Warm when he lets himself be. In a crisis, the stillest person in the room.",descriptionSecret:"Carries survivor's guilt from Jabiim — a months-long campaign where he lost nearly everyone, including his master. His warmth masks a deep fear of losing someone else.",descriptionRevealed:false,
+     history:"Raised in the Vossar Order from a young age, trained by a Vossar Knight outside the Temple and the High Council's orthodoxy. Fought in the Clone Wars embedded with planetary defence forces across the Outer Rim — training local militias, fighting alongside volunteer units, treating local troops as people rather than assets. Saw action in several major engagements as the war escalated. Jabiim was the last and worst — a grinding months-long campaign that cost him nearly his entire cohort and his master.",historySecret:"His master died in the late stages of Jabiim. Aelix and Paliz, then Padawans, were among the only survivors. The Vossar Council later ruled their survival constituted their Knighthood trials. Neither has ever said whether that helped.",historyRevealed:false,
+     rels:"Close bond with the party. Mentor figure to Kierra. Quietly and privately together with Senator Allendor.",relsSecret:"He and Cassia have been together for some time, kept private out of necessity — a Jedi operative and an Imperial Senator cannot afford to be publicly connected. She is one of three people who knows everything about Jabiim. Paliz and Kierra know about the relationship. No one else does.",relsRevealed:false},
+    {id:"npc2",name:"Master Taryn Voska",affiliation:"Vossar Jedi — Founder",rank:"Master",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Taryn%20Voska.jpeg",hidden:false,
      location:"Secret Temple",locationSecret:"The Temple location is known only to Vossar members and the party.",locationRevealed:false,
      description:"Philosophical leader and founder of the Vossar Jedi. Older, thoughtful, warm but carrying the weight of a fractured galaxy.",descriptionSecret:"Voska is dying. A slow Force illness — rare, quiet, and irreversible. He has perhaps one year. Only Leona Tai knows.",descriptionRevealed:false,
      history:"Departed the Jedi Temple a decade before the Clone Wars, establishing the Vossar Order. Survived Order 66 by independence from the main Order.",historySecret:"Voska left the Temple after a vision — he saw the Purge before it happened. The High Council dismissed him as unstable. He has never forgiven himself for not finding a way to warn them.",historyRevealed:false,
      rels:"Spiritual mentor to all Vossar Jedi. Sees the party as chosen by the Force.",relsSecret:"Voska believes one of the party will carry the Vossar Order forward after his death. He has not told them this.",relsRevealed:false},
-    {id:"npc3",name:"Kierra",affiliation:"Vossar Jedi — Padawan",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Kierra%20Vupil.jpg",hidden:false,
+    {id:"npc3",name:"Kierra",affiliation:"Vossar Jedi — Padawan",rank:"Padawan",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Kierra%20Vupil.jpg",hidden:false,
      location:"Secret Temple",locationSecret:"Often found mediating between Aelix and the younger Padawans when tensions rise.",locationRevealed:false,
      description:"Emerging leader among the Padawans. Often succeeds where the Knights struggle to connect. First met the party at the Rancor's Roost.",descriptionSecret:"Her Force sensitivity is unusually strong — stronger than most Knights. Voska has quietly noted this in his private records.",descriptionRevealed:false,
      history:"Guided the party to the Temple after spotting them at the Rancor's Roost. Has served as steady mentor during training.",historySecret:"Kierra was found by Aelix as a child on a Separatist-occupied world. Her family did not survive. She has built her identity entirely around the Vossar Order.",historyRevealed:false,
      rels:"Strong bond with the party. Close to Aelix and Voska.",relsSecret:"She is quietly in love with one of the party members but has said nothing, believing attachment will compromise her training.",relsRevealed:false},
-    {id:"npc4",name:"Initiate Sylos Mir",affiliation:"Vossar Jedi — Clan Aetherion",status:"alive",portrait:"",hidden:false,
+    {id:"npc4",name:"Initiate Sylos Mir",affiliation:"Vossar Jedi — Clan Aetherion",rank:"Initiate",status:"alive",portrait:"",hidden:false,
      location:"Secret Temple",locationSecret:"Spends most nights in the Temple archive rather than the dormitory. The other Padawans find him unsettling.",locationRevealed:false,
      description:"Young prodigy who speaks in cryptic visions. Said to have seen the fall and return of the Jedi. Eccentric and unsettling in equal measure.",descriptionSecret:"Sylos does not sleep. He meditates for what others would call sleep, but during those hours he receives visions. He has never told anyone what he truly sees — only fragments.",descriptionRevealed:false,
      history:"Member of Clan Aetherion. His visions have begun aligning with what the party is finding at Ossus.",historySecret:"Sylos saw the party's arrival months before it happened. He told Voska, who chose to act on it. The Rancor's Roost meeting was not coincidence — Aelix was sent specifically because of Sylos's vision.",historyRevealed:false,
      rels:"Mysterious connection to the party's Force-sensitive members. Closely watched by Master Voska.",relsSecret:"Sylos has seen one of the party die. He does not know when. He has been trying to find a way to prevent it without revealing what he knows.",relsRevealed:false},
-    {id:"npc5",name:"Queen Celine of House Adenor",affiliation:"Kingdom of Virellia",status:"alive",portrait:"",hidden:false,
+    {id:"npc5",name:"Queen Celine of House Adenor",affiliation:"Kingdom of Virellia",rank:"Monarch",status:"alive",portrait:"",hidden:false,
      location:"Virellian Space",locationSecret:"Moves between three royal residences on a rotating schedule for security. Only Baywhit knows the full pattern.",locationRevealed:false,
      description:"Monarch of Virellia. Young, calm command. Blends regal elegance with practical light armor. A tattoo beneath her sleeve — faint, deliberate, clearly significant.",descriptionSecret:"The tattoo is a Vossar Jedi mark — given to non-Force-sensitive allies who have sworn the Oath of the Order. Celine swore it at age nineteen.",descriptionRevealed:false,
      history:"Patron and protector of the rebel cell. Sheltered freed slaves, provided material support, and arranged the Pelion blockade run.",historySecret:"Celine's mother was Force-sensitive — a fact suppressed by the Royal House for generations. Celine is not, but she has always known. It is part of why she trusts the Vossar Jedi so completely.",historyRevealed:false,
      rels:"Patron of the cell. Trusts Aelix deeply. Drawn to Force-sensitive party members.",relsSecret:"Celine is in quiet contact with Mon Mothma's network directly — independent of the party. She is positioning Virellia to be a founding member of a formal Rebel Alliance.",relsRevealed:false},
-    {id:"npc6",name:"Senator Cassia Allendor",affiliation:"Virellian / Imperial Senate",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Cassia.jpg",hidden:false,
+    {id:"npc6",name:"Senator Cassia Allendor",affiliation:"Virellian / Imperial Senate",rank:"Senator / Countess",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Cassia.jpg",hidden:false,
      location:"Imperial Senate / Mobile",locationSecret:"Maintains a private residence on Coruscant separate from her official quarters — used for meetings that cannot be recorded.",locationRevealed:false,
-     description:"Countess of Meserian. Dark hair, sharp green eyes. Fights within the Imperial Senate for what remains of the Republic's ideals.",descriptionSecret:"She is Fulcrum's primary contact within the Senate. Mon Mothma knows. Almost no one else does.",descriptionRevealed:false,
-     history:"Has lobbied for Pelion relief alongside Mothma and Organa. Secured documentation of the Public Order Directive.",historySecret:"Cassia was the one who tipped off the Rebel network about the Prison Barge X-103 transfer. She accessed the classified manifest through a trusted aide who has since disappeared.",historyRevealed:false,
-     rels:"Unspoken personal connection to Aelix. Sees the party as assets. Ally of Mothma and Organa.",relsSecret:"Her connection to Aelix is not merely friendship. They were in love before the Purge. She believed he was dead for three years.",relsRevealed:false},
-    {id:"npc7",name:"Colonel Devand Chasid",affiliation:"Harloen Rangers — Rebel Cell",status:"alive",portrait:"",hidden:false,
+     description:"Countess of Meserian, born House Allendor — longtime loyal supporters of the Virellian crown. Dark hair, sharp green eyes. Publicly a careful Senate moderate; fights within the Imperial Senate for what remains of the Republic's ideals.",descriptionSecret:"She is Fulcrum's primary contact within the Senate. Mon Mothma knows. Almost no one else does.",descriptionRevealed:false,
+     history:"Met Aelix during the Clone Wars, when he was assigned to a protection detail covering Virellian noble households, including her and the young Queen Celine. Has lobbied for Pelion relief alongside Mothma and Organa. Secured documentation of the Public Order Directive.",historySecret:"Cassia was the one who tipped off the Rebel network about the Prison Barge X-103 transfer. She accessed the classified manifest through a trusted aide who has since disappeared.",historyRevealed:false,
+     rels:"Quietly and privately together with Aelix for years. Sees the party as assets worth real investment. Ally of Mothma and Organa.",relsSecret:"She is one of three people who know the full truth of what happened to Aelix at Jabiim. Neither of them has discussed what the war might eventually force them to choose.",relsRevealed:false},
+    {id:"npc7",name:"Colonel Devand Chasid",affiliation:"Harloen Rangers — Rebel Cell",rank:"Colonel",status:"alive",portrait:"",hidden:false,
      location:"Rebel Base",locationSecret:"Rarely sleeps more than four hours. Found in the operations room most nights reviewing patrol routes.",locationRevealed:false,
      description:"Commander of the Harloen Rangers and the rebel cell. Steady, respected, protective of his people.",descriptionSecret:"He blames himself for the Rangers who didn't make it out of Veilwatch. Four personnel were captured. He does not know if they are still alive.",descriptionRevealed:false,
      history:"Led the Rangers' defection from Harloen. Promoted from Captain after the successful extraction at Veilwatch Base.",historySecret:"Before joining the Rangers, Chasid served in the Republic Army during the Clone Wars. He fought alongside Jedi. He has never spoken of what happened to the Jedi he served with.",historyRevealed:false,
      rels:"Trusts the party after Veilwatch. Commands the cell alongside Captain Celt.",relsSecret:"He is quietly investigating what happened to the four captured Rangers. He has not told the party because he does not want them to feel obligated to help — and because he fears what they might find.",relsRevealed:false},
-    {id:"npc8",name:"Naresh",affiliation:"Independent — Smuggler",status:"alive",portrait:"",hidden:false,
+    {id:"npc8",name:"Naresh",affiliation:"Independent — Smuggler",rank:"",status:"alive",portrait:"",hidden:false,
      location:"Outer Rim",locationSecret:"Currently operating out of a modified freighter called the Gilded Compass. Dock locations change weekly.",locationRevealed:false,
      description:"Smuggler and intelligence contact with connections across the Outer Rim. Informal but reliable.",descriptionSecret:"Naresh is not just a smuggler. He is a former ISB analyst who defected five years ago. His intelligence connections run deep — and the Empire still wants him.",descriptionRevealed:false,
      history:"Provided confirmed intelligence on the Crymorah Syndicate on Ryndal IV. The party owes him a favor.",historySecret:"His Crymorah tip cost him a safe house and a contact he had spent two years building. He has not told the party the full extent of what he sacrificed.",historyRevealed:false,
      rels:"Informal contact. Reliable but expensive. Party owes him a favor.",relsSecret:"He has a daughter he hasn't seen in three years. She lives under a false name on a Core world. Protecting her is why he does what he does.",relsRevealed:false},
-    {id:"npc9",name:"Ped Baywhit",affiliation:"Kingdom of Virellia — KDA",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Ped%20Baywhit.jpg",hidden:true,
+    {id:"npc9",name:"Ped Baywhit",affiliation:"Kingdom of Virellia — KDA",rank:"Royal Advisor",status:"alive",portrait:"https://raw.githubusercontent.com/alexanderdarthmoor-code/Player-Registry-SW5E/main/assets/portraits/Ped%20Baywhit.jpg",hidden:true,
      location:"Virellian Space",locationSecret:"His true office is not the one listed in court records. He operates from a classified location beneath the Palace.",locationRevealed:false,
      description:"Royal Advisor to Queen Celine and leader of the KDA. Speaks little. When he does, people listen.",descriptionSecret:"Baywhit runs the Kingdom's Directorate of Acquisitions — officially a trade bureau. In reality it is an intelligence service with operatives across the Outer Rim.",descriptionRevealed:false,
      history:"The quiet power behind the Queen's political operations. Has been watching the party since their first meeting.",historySecret:"Baywhit served as a spy for the Republic Senate before the Clone Wars. He knows where every secret is buried in the Kathari Expanse — and who buried it.",historyRevealed:false,
      rels:"Serves the Queen absolutely. Neutral toward the party but watchful.",relsSecret:"He has a file on every member of the party. He compiled it the night after their first meeting. He is not hostile — but he is not unconditionally friendly either.",relsRevealed:false},
-    {id:"npc10",name:"Knight Oran Vex",affiliation:"Vossar Jedi — Clan Vorsa",status:"alive",portrait:"",hidden:true,
+    {id:"npc10",name:"Knight Oran Vex",affiliation:"Vossar Jedi — Clan Vorsa",rank:"Knight",status:"alive",portrait:"",hidden:true,
      location:"Imperial Supply Fleet (Embedded)",locationSecret:"Currently embedded as a logistics officer named Davan Trel aboard the ISD Relentless's supply convoy.",locationRevealed:false,
      description:"Master of disguise and deep cover operative for Clan Vorsa. Currently embedded within an Imperial supply fleet.",descriptionSecret:"His cover is compromised. He knows it. He has not been able to signal the Order without breaking the identity entirely.",descriptionRevealed:false,
      history:"One of the Vossar Order's most capable infiltrators. Has been undercover for months.",historySecret:"Vex was Riella Sharn's first apprentice before Sharn founded Clan Vorsa. He has been in deep cover operations continuously for eleven years. He has not used his real name in four.",historyRevealed:false,
@@ -2048,20 +2049,19 @@ function openCodexModal(type,id){
     html+=cdxPortrait(entry,"👤");
     html+=`<div class="cdx-modal-body">`;
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Affiliation</div><div class="cdx-modal-val">${entry.affiliation}</div></div>`;
+    if(entry.rank)html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Rank / Title</div><div class="cdx-modal-val">${entry.rank}</div></div>`;
     if(entry.threat)html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Threat Level</div><div class="cdx-modal-val"><span class="cdx-badge threat-${entry.threat}">${entry.threat} threat</span></div></div>`;
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Status</div><div class="cdx-modal-val">${cdxStatusBadge(entry.status)}</div></div>`;
-    // Location
-    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Last Known Location</div><div class="cdx-modal-val">${entry.location}</div></div>`;
-    html+=cdxSecretField(type,id,'location','Location Secret',entry.locationSecret,entry.locationRevealed,isDM);
-    // Description
-    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Description</div><div class="cdx-modal-val">${entry.description}</div></div>`;
-    html+=cdxSecretField(type,id,'description','Description Secret',entry.descriptionSecret,entry.descriptionRevealed,isDM);
+    // Appearance / Physical Description
+    html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Appearance</div><div class="cdx-modal-val" style="font-style:italic">${entry.description}</div></div>`;
+    html+=cdxSecretField(type,id,'description','Appearance Secret',entry.descriptionSecret,entry.descriptionRevealed,isDM);
     // History
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">History</div><div class="cdx-modal-val">${entry.history}</div></div>`;
     html+=cdxSecretField(type,id,'history','History Secret',entry.historySecret,entry.historyRevealed,isDM);
     // Relationships
     html+=`<div class="cdx-modal-field"><div class="cdx-modal-lbl">Relationships</div><div class="cdx-modal-val">${entry.rels}</div></div>`;
     html+=cdxSecretField(type,id,'rels','Relationships Secret',entry.relsSecret,entry.relsRevealed,isDM);
+
   } else if(type==="planets"){
     html+=cdxPortrait(entry,"🌍");
     html+=`<div class="cdx-modal-body">`;
@@ -2131,16 +2131,17 @@ function addCodexEntry(type){
   const entry={id:type+Date.now(),name,hidden:false};
   if(type==="npcs"||type==="villains"){
     entry.affiliation=prompt("Affiliation:","")||"";
+    entry.rank=prompt("Rank / Title (e.g. Knight, Colonel, Senator):","")||"";
     entry.status=prompt("Status (alive/missing/dead/unknown):","alive")||"alive";
     if(type==="villains")entry.threat=prompt("Threat level (low/moderate/high/critical):","moderate")||"moderate";
-    entry.location=prompt("Last known location:","")||"Unknown";
     entry.portrait="";
-    entry.description=prompt("Description:","")||"";
+    entry.description=prompt("Physical appearance:","")||"";
     entry.descriptionSecret="";entry.descriptionRevealed=false;
     entry.history=prompt("History:","")||"";
     entry.historySecret="";entry.historyRevealed=false;
     entry.rels=prompt("Relationships:","")||"";
     entry.relsSecret="";entry.relsRevealed=false;
+    entry.location=prompt("Last known location:","")||"Unknown";
     entry.locationSecret="";entry.locationRevealed=false;
   }else if(type==="planets"){
     entry.region=prompt("Region:","")||"";
@@ -2161,7 +2162,7 @@ function addCodexEntry(type){
 function editCodexEntry(type,id){
   if(!window.requireDM())return;
   const entry=codexData[type].find(e=>e.id===id);if(!entry)return;
-  const field=prompt("Edit field:\nname / affiliation / status / location / portrait / description / history / rels (NPC)\nname / region / control / description / locations (Planet)\nname / type / disposition / description / history (Org)");
+  const field=prompt("Edit field:\nname / affiliation / rank / status / location / portrait / description / history / rels (NPC)\nname / region / control / description / locations (Planet)\nname / type / disposition / description / history (Org)");
   if(!field)return;
   const val=prompt("New value:",entry[field]||"");
   if(val===null)return;
@@ -2316,10 +2317,22 @@ function renderCodex(){
     return JSON.stringify(e).toLowerCase().includes(q);
   });
 
+  // NPC group filter
+  function npcGroup(e){
+    const a=(e.affiliation||"").toLowerCase();
+    if(a.includes("vossar"))return "vossar";
+    if(a.includes("virellia")||a.includes("harloen")||a.includes("virellian"))return "virellian";
+    return "other";
+  }
+  const npcFilterRow=codexTab==="npcs"?`<div style="display:flex;gap:4px;margin-top:6px">
+    ${["all","vossar","virellian","other"].map(f=>`<button class="ppkr-filter${npcFilter===f?" active":""}" onclick="npcFilter='${f}';render()">${{all:"All",vossar:"Vossar Jedi",virellian:"Virellian Rebels",other:"Other"}[f]}</button>`).join("")}
+  </div>`:"";
+
   let cards="";
   if(codexTab==="npcs"||codexTab==="villains"){
     const type=codexTab;
-    cards=filtered.map(e=>{
+    const displayList=codexTab==="npcs"&&npcFilter!=="all"?filtered.filter(e=>npcGroup(e)===npcFilter):filtered;
+    cards=displayList.map(e=>{
       const statusBadge=isDM
         ?`<span class="cdx-badge ${({alive:"st-alive",missing:"st-missing",dead:"st-dead",unknown:"st-unknown"})[e.status||"alive"]} status-toggle" onclick="event.stopPropagation();toggleNPCStatus('${type}','${e.id}')" title="Click to change status">${e.status||"alive"}</span>`
         :cdxStatusBadge(e.status||"alive");
@@ -2327,11 +2340,12 @@ function renderCodex(){
       const body=e.hidden&&!isDM?
         `<div class="cdx-redacted"><span class="cdx-redacted-txt">⬛ CLASSIFIED — DM EYES ONLY</span></div>`:
         `<div class="cdx-card-body">
-          ${e.portrait?`<img src="${e.portrait}" style="width:100%;height:140px;object-fit:cover;object-position:top;border-radius:2px;margin-bottom:.65rem">` :""}
-          <div class="cdx-field"><div class="cdx-field-lbl">Affiliation</div><div class="cdx-field-val">${e.affiliation}</div></div>
+          ${e.portrait?`<img src="${e.portrait}" style="width:100%;height:160px;object-fit:cover;object-position:top;border-radius:2px;margin-bottom:.75rem">` :""}
+          <div class="cdx-field"><div class="cdx-field-lbl">Affiliation</div><div class="cdx-field-val">${e.affiliation}${e.rank?` <span style="font-family:var(--fm);font-size:9px;color:var(--adim);letter-spacing:.08em">· ${e.rank}</span>`:""}</div></div>
           ${e.threat?`<div class="cdx-field"><div class="cdx-field-lbl">Threat Level</div><div class="cdx-field-val">${threatBadge}</div></div>`:""}
-          <div class="cdx-field"><div class="cdx-field-lbl">Last Known Location</div><div class="cdx-field-val">${e.location}</div></div>
-          <div class="cdx-field"><div class="cdx-field-lbl">Description</div><div class="cdx-field-val">${e.description}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Appearance</div><div class="cdx-field-val" style="font-style:italic;color:var(--txt2)">${e.description}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">History</div><div class="cdx-field-val">${e.history}</div></div>
+          <div class="cdx-field"><div class="cdx-field-lbl">Relationships</div><div class="cdx-field-val">${e.rels}</div></div>
           ${isDM?`<div class="cdx-actions">
             <button class="abtn" onclick="editCodexEntry('${type}','${e.id}')">Edit</button>
             <button class="abtn" onclick="toggleHidden('${type}','${e.id}')">${e.hidden?"Reveal":"Hide"}</button>
@@ -2341,7 +2355,10 @@ function renderCodex(){
       return `<div class="cdx-card${e.hidden?" hidden-entry":""}" style="cursor:pointer" onclick="openCodexModal('${type}','${e.id}')">
         <div class="cdx-card-hdr">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="cdx-card-title">${e.name}</span>
+            <div>
+              <span class="cdx-card-title">${e.name}</span>
+              ${e.rank?`<div style="font-family:var(--fm);font-size:9px;color:var(--adim);letter-spacing:.08em;margin-top:1px">${e.rank}</div>`:""}
+            </div>
             ${statusBadge}
             ${e.hidden?`<span class="cdx-badge st-unknown">Hidden</span>`:""}
           </div>
@@ -2400,11 +2417,12 @@ function renderCodex(){
     <div class="cdx-top">
       <input class="cdx-search" placeholder="Search codex..." value="${codexSearch}" oninput="cdxSearch=this.value;render()">
       <div class="cdx-tabs">
-        <button class="cdx-tab${codexTab==="npcs"?" active":""}" onclick="codexTab='npcs';render()">NPCs</button>
+        <button class="cdx-tab${codexTab==="npcs"?" active":""}" onclick="codexTab='npcs';npcFilter='all';render()">NPCs</button>
         <button class="cdx-tab${codexTab==="planets"?" active":""}" onclick="codexTab='planets';render()">Planets</button>
         <button class="cdx-tab${codexTab==="orgs"?" active":""}" onclick="codexTab='orgs';render()">Organizations</button>
         <button class="cdx-tab${codexTab==="villains"?" active":""}" onclick="codexTab='villains';render()">Villains</button>
       </div>
+      ${npcFilterRow}
       ${isDM?`<button class="abtn" onclick="addCodexEntry('${codexTab}')">+ Add entry</button>`:""}
     </div>
     <div class="cdx-grid">${isEmpty?`<div style="font-size:13px;color:var(--txt3);padding:.5rem 0">${q?"No results for that search.":"No entries yet."}</div>`:cards}</div>
@@ -2852,7 +2870,7 @@ window.toggleNPCStatus=toggleNPCStatus;
 
 // ── Villains tab data ─────────────────────────────────────────────────────
 const VILLAIN_DEFAULTS=[
-  {id:"vil1",name:"The Seventh Sister",affiliation:"Imperial Inquisitorius",status:"alive",threat:"high",portrait:"",hidden:false,
+  {id:"vil1",name:"The Seventh Sister",affiliation:"Imperial Inquisitorius",rank:"Seventh Sister — Imperial Inquisitor",status:"alive",threat:"high",portrait:"",hidden:false,
    location:"Sector Command — Mobile",locationSecret:"Currently assigned to the Kathari Expanse specifically. Her orders came from Vader directly after the Prison Barge operation.",locationRevealed:false,
    description:"An Imperial Inquisitor. Double-bladed crimson lightsaber. Presence confirmed during the Prison Barge X-103 operation. Cold, precise, and patient in a way that makes her more dangerous than the ones who rage.",descriptionSecret:"She was a Jedi Padawan before Order 66. Her master died protecting her. The Empire found her three months later. Whatever they did to turn her took less time than it should have.",descriptionRevealed:false,
    history:"Confirmed active in the sector. Her assignment predates the party's involvement — she was already hunting Force-sensitives in the Kathari Expanse before the Prison Barge incident brought her into direct contact with the cell.",historySecret:"She has a file on the Vossar Jedi Order that predates the party's involvement by two years. Someone fed the Inquisitorius information about Vossar from the inside. She knows more than she should.",historyRevealed:false,
